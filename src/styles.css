@@ -1,1 +1,27 @@
-/* You can add global styles to this file, and also import other style files */
+@import '@circlon/angular-tree-component/css/angular-tree-component.css';
+@import 'bootstrap/dist/css/bootstrap.min.css';
+
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+.upload-box {
+    width: 100px;
+    height: 100px;
+    border: 2px dashed #ccc;
+    border-radius: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .upload-box:hover {
+    background-color: #f0f0f0;
+  }
+  
+  .plus-sign {
+    font-size: 72px;
+    color: #999;
+  }
+  

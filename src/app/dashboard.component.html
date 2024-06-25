@@ -1,0 +1,49 @@
+
+<hr>
+
+<div class="upload-box" (click)="triggerFileInput()">
+  <input type="file" #fileInput style="display: none;" (change)="onFileSelected($event)">
+  <span class="plus-sign">+</span>
+</div>
+
+
+<hr>
+
+<h3>Uploaded Study Materials</h3>
+<mat-tree [dataSource]="dataSource" [treeControl]="treeControl">
+  <mat-tree-node *matTreeNodeDef="let node" matTreeNodePadding>
+    <button mat-icon-button disabled></button>
+    <mat-checkbox [checked]="node.isSelected" (change)="onNodeSelected(node)">{{node.name}}</mat-checkbox>
+    <button mat-button (click)="createFolder(node._id)">New Folder</button>
+  </mat-tree-node>
+  <mat-tree-node *matTreeNodeDef="let node; when: hasChild" matTreeNodePadding>
+    <button mat-icon-button [attr.aria-label]="'Toggle ' + node.name" matTreeNodeToggle>
+      <mat-icon class="mat-icon-rtl-mirror">
+        {{treeControl.isExpanded(node) ? 'expand_more' : 'chevron_right'}}
+      </mat-icon>
+    </button>
+    <mat-checkbox [checked]="node.isSelected" (change)="onNodeSelected(node)">{{node.name}}</mat-checkbox>
+    <button mat-button (click)="createFolder(node._id)">New Folder</button>
+  </mat-tree-node>
+</mat-tree>
+
+<hr>
+
+<button mat-raised-button color="warn" (click)="deleteSelectedMaterials()">Delete Selected</button>
+<button mat-raised-button color="primary" (click)="refreshTreeData()">Refresh</button>
+
+
+<h3>Request Study Material</h3>
+<form (ngSubmit)="requestMaterial()">
+  <div class="mb-3">
+    <label for="materialType" class="form-label">Material Type:</label>
+    <select class="form-select" id="materialType" [(ngModel)]="materialType" name="materialType" required>
+      <option value="">Select a material type</option>
+      <option value="notes">Notes</option>
+      <option value="flashcards">Flashcards</option>
+      <option value="quiz">Quiz</option>
+    </select>
+  </div>
+  <button type="submit" mat-raised-button color="primary">Request Material</button>
+</form>
+
