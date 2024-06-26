@@ -7,20 +7,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { FlatTreeControl } from '@angular/cdk/tree';
-import { FileNode } from './file-node.model';
+import { FileNode, IFlatNode } from './file-node.model';
+
 import { Modal } from 'bootstrap';
 
-interface FlatNode {
-  expandable: boolean;
-  name: string;
-  type: 'folder' | 'file';
-  level: number;
-  isSelected: boolean;
-  _id: string | undefined;
-  path?: string;
-  subjectTag?: string;
-  parentFolder?: string | null;
-}
 
 @Component({
   selector: 'app-dashboard',
@@ -38,22 +28,23 @@ interface FlatNode {
 })
 export class DashboardComponent implements OnInit {
   @ViewChild('fileInput') fileInput!: ElementRef;
-
-  private _transformer = (node: FileNode, level: number): FlatNode => {
+  private _transformer = (node: FileNode, level: number): IFlatNode => {
     return {
       expandable: !!node.children && node.children.length > 0,
       name: node.name,
       type: node.type,
       level: level,
-      isSelected: node.isSelected,
+      isSelected: node.isSelected ?? false,
       _id: node._id,
       path: node.path,
       subjectTag: node.subjectTag,
-      parentFolder: node.parentFolder || undefined
+      parentFolder: node.parentFolder || null
     };
   }
+  
+  
 
-  treeControl = new FlatTreeControl<FlatNode>(
+  treeControl = new FlatTreeControl<IFlatNode>(
     node => node.level,
     node => node.expandable
   );
@@ -128,23 +119,52 @@ export class DashboardComponent implements OnInit {
     this.dataSource.data = newData;
   }
 
-  hasChild = (_: number, node: FlatNode) => node.expandable;
+  hasChild = (_: number, node: IFlatNode) => node.expandable;
 
-  toggleNodeSelection(node: FlatNode): void {
+  toggleNodeSelection(node: IFlatNode): void {
     node.isSelected = !node.isSelected;
   }
 
   fetchTreeData() {
-    this.http.get<FileNode[]>('/api/tree').subscribe({
+    this.http.get<FileNode[]>('/api/files/tree').subscribe({
       next: (data) => {
         console.log('Fetched tree data:', data);
         this.dataSource.data = data;
+        // Refresh the tree
+        this.treeControl.dataNodes = this.treeFlattener.flattenNodes(data);
+        this.treeControl.expandAll();
       },
       error: (error) => {
         console.error('Error fetching tree data:', error);
       }
     });
   }
+  
+  
+  private transformFileNodesToFlatNodes(nodes: FileNode[], level: number = 0): IFlatNode[] {
+    return nodes.reduce<IFlatNode[]>((accumulator, node) => {
+      const flatNode: IFlatNode = {
+        expandable: !!node.children && node.children.length > 0,
+        name: node.name,
+        type: node.type,
+        level: level,
+        isSelected: false,
+        _id: node._id,
+        path: node.path,
+        subjectTag: node.subjectTag,
+        parentFolder: node.parentFolder
+      };
+      accumulator.push(flatNode);
+  
+      if (node.children && node.children.length > 0) {
+        accumulator.push(...this.transformFileNodesToFlatNodes(node.children, level + 1));
+      }
+  
+      return accumulator;
+    }, []);
+  }
+  
+  
 
   getSelectedMaterialIds(): string[] {
     return this.treeControl.dataNodes
@@ -168,32 +188,38 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  onNodeSelected(node: FlatNode) {
+  onNodeSelected(node: IFlatNode) {
     console.log("Node selected:", node.name, node.isSelected);
     node.isSelected = !node.isSelected;
   }
 
   deleteSelectedMaterials() {
     const materialIdsToDelete = this.getSelectedMaterialIds();
-
+  
     if (materialIdsToDelete.length === 0) {
       alert('Please select materials to delete.');
       return;
     }
-
+  
     if (confirm('Are you sure you want to delete the selected materials?')) {
-      this.http.post('/api/files/delete-materials', { materialIDs: materialIdsToDelete }).subscribe({
-        next: () => {
-          console.log('Materials deleted successfully');
-          this.refreshTreeData();
+      this.http.post<{message: string, deletedIDs: string[]}>('/api/files/delete-materials', { materialIDs: materialIdsToDelete }).subscribe({
+        next: (response) => {
+          console.log('Materials deleted successfully', response);
+          // Remove deleted items from the data source
+          this.dataSource.data = this.dataSource.data.filter(node => !response.deletedIDs.includes(node._id));
+          // The dataSource will automatically update the flat node data
+          this.treeControl.expandAll();
         },
         error: (error) => {
           console.error('Error deleting materials:', error);
-          // TODO: Add user-friendly error handling
+          alert('Error deleting materials. Please try again.');
         }
       });
     }
   }
+  
+  
+  
 
   refreshTreeData() {
     this.fetchTreeData();
