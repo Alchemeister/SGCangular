@@ -1,28 +1,33 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { environment } from '../environments/environment';
+import { FileNode } from './file-node.model';
 
-// Make sure this interface matches your backend's data structure
-interface FileNode {
-  _id?: string;
-  name: string;
-  type: 'folder' | 'file';
-  path?: string;
-  subjectTag?: string;
-  parentFolder?: string;
-  children?: FileNode[];
-}
-
-@Injectable({ providedIn: 'root' })
+@Injectable({
+  providedIn: 'root'
+})
 export class FileService {
-  private apiUrl = environment.apiUrl;
+  private apiUrl = 'http://localhost:3000/api'; // Adjust this to your API URL
 
   constructor(private http: HttpClient) {}
 
   getTreeData(): Observable<FileNode[]> {
-    return this.http.get<FileNode[]>(`${this.apiUrl}/tree`);
+    return this.http.get<FileNode[]>(`${this.apiUrl}/files/tree`);
   }
 
-  // We'll add more methods here later for other API calls
+  uploadFile(formData: FormData): Observable<any> {
+    return this.http.post(`${this.apiUrl}/files/upload`, formData);
+  }
+
+  createFolder(name: string, parentFolder?: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/files/folders`, { name, parentFolder });
+  }
+
+  deleteSelectedMaterials(materialIds: string[]): Observable<any> {
+    return this.http.post(`${this.apiUrl}/files/delete-materials`, { materialIds });
+  }
+
+  requestMaterial(materialIDs: string[], materialType: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/request-material`, { materialIDs, materialType });
+  }
 }
