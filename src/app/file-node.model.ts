@@ -8,10 +8,11 @@ export interface FileNode {
   subjectTag?: string;
   isSelected?: boolean;
 }
+
 export interface IFlatNode {
   expandable: boolean;
   name: string;
-  type: 'folder' | 'file';
+  type: 'file' | 'folder';
   level: number;
   isSelected: boolean;
   _id: string;

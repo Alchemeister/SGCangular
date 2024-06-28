@@ -24,8 +24,10 @@ export class FileService {
   }
 
   deleteSelectedMaterials(materialIds: string[]): Observable<any> {
-    return this.http.post(`${this.apiUrl}/files/delete-materials`, { materialIds });
+    console.log('Sending delete request with materialIds:', materialIds);
+    return this.http.post('/api/files/delete-materials', { materialIds });
   }
+  
 
   requestMaterial(materialIDs: string[], materialType: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/request-material`, { materialIDs, materialType });

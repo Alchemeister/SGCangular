@@ -13,7 +13,7 @@
 <mat-tree [dataSource]="dataSource" [treeControl]="treeControl">
   <mat-tree-node *matTreeNodeDef="let node" matTreeNodePadding>
     <button mat-icon-button disabled></button>
-    <mat-checkbox [checked]="node.isSelected" (change)="onNodeSelected(node)">{{node.name}}</mat-checkbox>
+    <mat-checkbox [checked]="node.isSelected" (change)="toggleNodeSelection(node)">{{node.name}}</mat-checkbox>
     <button mat-button (click)="createFolder(node._id)">New Folder</button>
   </mat-tree-node>
   <mat-tree-node *matTreeNodeDef="let node; when: hasChild" matTreeNodePadding>

@@ -1,4 +1,4 @@
-import { Component, OnInit, Renderer2, Inject, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, Renderer2, Inject, ViewChild, ElementRef, ChangeDetectorRef, SecurityContext } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatTreeModule, MatTreeFlatDataSource, MatTreeFlattener } from '@angular/material/tree';
@@ -9,6 +9,7 @@ import { FlatTreeControl } from '@angular/cdk/tree';
 import { FileNode, IFlatNode } from './file-node.model';
 import { FileService } from './file.service';
 import { Modal } from 'bootstrap';
+import { DomSanitizer } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-dashboard',
@@ -36,7 +37,7 @@ export class DashboardComponent implements OnInit {
       _id: node._id,
       path: node.path,
       subjectTag: node.subjectTag,
-      parentFolder: node.parentFolder || null
+      parentFolder: node.parentFolder ?? null
     };
   }
 
@@ -58,25 +59,29 @@ export class DashboardComponent implements OnInit {
   selectedParentFolderId: string = '';
   subjectTag: string = '';
   materialType: string = '';
+  selectedNodeIds: string[] = []; // To store the IDs of selected nodes
 
   constructor(
     private fileService: FileService,
     private renderer: Renderer2,
-    @Inject(DOCUMENT) private document: Document
+    @Inject(DOCUMENT) private document: Document,
+    private sanitizer: DomSanitizer,
+    private changeDetectorRef: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
     this.fetchTreeData();
   }
 
-  triggerFileInput() {
+  public triggerFileInput() {
     this.fileInput.nativeElement.click();
   }
 
-  onFileSelected(event: any) {
+  public onFileSelected(event: any) {
     const file: File = event.target.files[0];
     if (file) {
       this.uploadFile(file);
+      event.target.value = '';
     }
   }
 
@@ -94,40 +99,49 @@ export class DashboardComponent implements OnInit {
       this.fileService.uploadFile(formData).subscribe({
         next: (response: any) => {
           console.log('File uploaded:', response);
-          if (response.fileNode) {
-            this.addFileNodeToTree(response.fileNode);
-          } else {
-            this.fetchTreeData();
-          }
+          this.fetchTreeData();
           this.resetForm();
         },
         error: (error) => {
           console.error('Error uploading file:', error);
           alert('Error uploading file. Please try again.');
+          this.fetchTreeData();
         }
       });
     }
   }
 
-  addFileNodeToTree(fileNode: any) {
-    const newData = [...this.dataSource.data];
-    newData.push(fileNode);
-    this.dataSource.data = newData;
-  }
+  public hasChild = (_: number, node: IFlatNode) => node.expandable;
 
-  hasChild = (_: number, node: IFlatNode) => node.expandable;
+  public onNodeSelected(node: IFlatNode) {
+    this.toggleNodeSelection(node);
+  }
 
   toggleNodeSelection(node: IFlatNode): void {
     node.isSelected = !node.isSelected;
+
+    // Update the selectedNodeIds array
+    if (node.isSelected) {
+      this.selectedNodeIds.push(node._id); 
+    } else {
+      const index = this.selectedNodeIds.indexOf(node._id);
+      if (index > -1) {
+        this.selectedNodeIds.splice(index, 1);
+      }
+    }
+
+    this.updateParentSelection(node);
+    this.updateChildSelection(node);
+    this.changeDetectorRef.detectChanges();
   }
 
   fetchTreeData() {
     this.fileService.getTreeData().subscribe({
-      next: (data) => {
-        console.log('Fetched tree data:', data);
-        this.dataSource.data = data;
-        this.treeControl.dataNodes = this.treeFlattener.flattenNodes(data);
+      next: (data: FileNode[]) => {
+        this.dataSource.data = this.preserveSelection(data); // Preserve selections
+        this.treeControl.dataNodes = this.treeFlattener.flattenNodes(this.dataSource.data);
         this.treeControl.expandAll();
+        this.changeDetectorRef.detectChanges();
       },
       error: (error) => {
         console.error('Error fetching tree data:', error);
@@ -135,35 +149,16 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  private transformFileNodesToFlatNodes(nodes: FileNode[], level: number = 0): IFlatNode[] {
-    return nodes.reduce<IFlatNode[]>((accumulator, node) => {
-      const flatNode: IFlatNode = {
-        expandable: !!node.children && node.children.length > 0,
-        name: node.name,
-        type: node.type,
-        level: level,
-        isSelected: false,
-        _id: node._id,
-        path: node.path,
-        subjectTag: node.subjectTag,
-        parentFolder: node.parentFolder
-      };
-      accumulator.push(flatNode);
-
-      if (node.children && node.children.length > 0) {
-        accumulator.push(...this.transformFileNodesToFlatNodes(node.children, level + 1));
-      }
-
-      return accumulator;
-    }, []);
+  private preserveSelection(newNodes: FileNode[]): FileNode[] {
+    return newNodes.map(newNode => ({
+      ...newNode,
+      isSelected: this.selectedNodeIds.includes(newNode._id), // Maintain selection
+      children: newNode.children ? this.preserveSelection(newNode.children) : []
+    }));
   }
 
   getSelectedMaterialIds(): string[] {
-    const selectedIds = this.treeControl.dataNodes
-      .filter(node => node.isSelected && node._id)
-      .map(node => node._id);
-    console.log('Selected IDs:', selectedIds);
-    return selectedIds;
+    return this.selectedNodeIds; 
   }
 
   createFolder(parentFolderId?: string) {
@@ -182,30 +177,49 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  onNodeSelected(node: IFlatNode) {
-    console.log("Node selected:", node.name, node.isSelected);
-    node.isSelected = !node.isSelected;
+  private updateParentSelection(node: IFlatNode) {
+    const parent = this.getParentNode(node);
+    if (parent) {
+      parent.isSelected = this.descendantsAllSelected(parent);
+      this.updateParentSelection(parent);
+    }
   }
 
-  getSelectedMaterialPaths(): string[] {
-    console.log('All nodes:', this.treeControl.dataNodes);
-    const selectedPaths = this.treeControl.dataNodes
-      .filter(node => {
-        console.log(`Node: ${node.name}, Path: ${node.path}, Selected: ${node.isSelected}`);
-        return node.isSelected && node.path;
-      })
-      .map(node => node.path!)
-      .filter((path): path is string => path !== undefined);
+  private updateChildSelection(node: IFlatNode) {
+    if (node.expandable) {
+      this.treeControl.getDescendants(node).forEach(child => {
+        child.isSelected = node.isSelected;
+      });
+    }
+  }
 
-    console.log('Selected material paths:', selectedPaths);
-    return selectedPaths;
+  private getParentNode(node: IFlatNode): IFlatNode | null {
+    const currentLevel = node.level;
+    if (currentLevel < 1) {
+      return null;
+    }
+    const startIndex = this.treeControl.dataNodes.indexOf(node) - 1;
+    for (let i = startIndex; i >= 0; i--) {
+      const currentNode = this.treeControl.dataNodes[i];
+      if (currentNode.level < currentLevel) {
+        return currentNode;
+      }
+    }
+    return null;
+  }
+
+  private descendantsAllSelected(node: IFlatNode): boolean {
+    const descendants = this.treeControl.getDescendants(node);
+    return descendants.every(child => child.isSelected);
   }
 
   deleteSelectedMaterials() {
+    console.log('Starting delete operation');
     const materialIdsToDelete = this.getSelectedMaterialIds();
     console.log('Materials to delete:', materialIdsToDelete);
 
     if (materialIdsToDelete.length === 0) {
+      console.log('No materials selected for deletion');
       alert('Please select materials to delete.');
       return;
     }
@@ -225,6 +239,7 @@ export class DashboardComponent implements OnInit {
             } else {
               alert('Error deleting materials. Please try again.');
             }
+            this.fetchTreeData();
           }
         });
     }
@@ -237,7 +252,7 @@ export class DashboardComponent implements OnInit {
   requestMaterial() {
     console.log('Requesting material of type:', this.materialType);
     const selectedMaterials = this.getSelectedMaterialIds();
-     
+
     if (selectedMaterials.length === 0) {
       alert('Please select at least one material.');
       return;
@@ -258,6 +273,7 @@ export class DashboardComponent implements OnInit {
           alert('Error: No study material generated. Please try again.');
         }
         this.materialType = '';
+        this.fetchTreeData();
       },
       error: (error) => {
         console.error('Error requesting study material:', error);
@@ -266,6 +282,7 @@ export class DashboardComponent implements OnInit {
           errorMessage = error.error.message;
         }
         alert(errorMessage);
+        this.fetchTreeData();
       }
     });
   }
@@ -303,7 +320,17 @@ export class DashboardComponent implements OnInit {
 
     const modalBody = this.renderer.createElement('div');
     this.renderer.addClass(modalBody, 'modal-body');
-    this.renderer.setProperty(modalBody, 'innerHTML', content);
+    this.renderer.setProperty(modalBody, 'innerHTML', this.sanitizer.sanitize(SecurityContext.HTML, content));
+
+    const submitButton = this.renderer.createElement('button');
+    this.renderer.addClass(submitButton, 'btn');
+    this.renderer.addClass(submitButton, 'btn-primary');
+    this.renderer.appendChild(submitButton, this.renderer.createText('Submit Quiz'));
+    this.renderer.listen(submitButton, 'click', () => this.submitQuiz(modalBody));
+
+    const scoreDisplay = this.renderer.createElement('div');
+    this.renderer.setAttribute(scoreDisplay, 'id', 'quiz-score');
+    this.renderer.setStyle(scoreDisplay, 'display', 'none');
 
     const modalFooter = this.renderer.createElement('div');
     this.renderer.addClass(modalFooter, 'modal-footer');
@@ -319,6 +346,8 @@ export class DashboardComponent implements OnInit {
     this.renderer.appendChild(modalHeader, closeButton);
     this.renderer.appendChild(modalContent, modalHeader);
     this.renderer.appendChild(modalContent, modalBody);
+    this.renderer.appendChild(modalFooter, submitButton);
+    this.renderer.appendChild(modalFooter, scoreDisplay);
     this.renderer.appendChild(modalFooter, footerCloseButton);
     this.renderer.appendChild(modalContent, modalFooter);
     this.renderer.appendChild(modalDialog, modalContent);
@@ -332,6 +361,46 @@ export class DashboardComponent implements OnInit {
     modalDiv.addEventListener('hidden.bs.modal', () => {
       this.renderer.removeChild(this.document.body, modalDiv);
     });
+  }
+
+  private submitQuiz(quizElement: HTMLElement) {
+    const questions = quizElement.querySelectorAll('ol > li');
+    const answerKey = quizElement.querySelector('#answer-key');
+
+    if (!answerKey) {
+      console.error('Answer key not found in the quiz');
+      return;
+    }
+
+    let totalQuestions = questions.length;
+    let score = 0;
+
+    questions.forEach((question, index) => {
+      const selectedAnswer = question.querySelector('input[type="radio"]:checked');
+      if (selectedAnswer) {
+        const questionNumber = index + 1;
+        const userAnswer = (selectedAnswer as HTMLInputElement).value;
+        const match = answerKey.textContent?.match(new RegExp(`${questionNumber}\\. (\\w)`));
+        const correctAnswer = match ? match[1] : null;
+
+        if (userAnswer === correctAnswer) {
+          score++;
+        }
+      }
+    });
+
+    const scoreDisplay = quizElement.querySelector('#quiz-score') as HTMLElement;
+    if (scoreDisplay) {
+      scoreDisplay.textContent = `Your score: ${score} out of ${totalQuestions}`;
+      scoreDisplay.style.display = 'block';
+    } else {
+      console.error('Score display element not found');
+      const newScoreDisplay = this.renderer.createElement('div');
+      this.renderer.setAttribute(newScoreDisplay, 'id', 'quiz-score');
+      this.renderer.setProperty(newScoreDisplay, 'textContent', `Your score: ${score} out of ${totalQuestions}`);
+      this.renderer.setStyle(newScoreDisplay, 'display', 'block');
+      this.renderer.appendChild(quizElement, newScoreDisplay);
+    }
   }
 
   private resetForm() {
