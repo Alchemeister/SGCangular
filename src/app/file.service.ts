@@ -1,7 +1,9 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { FileNode } from './file-node.model';
+import { map } from 'rxjs/operators';
 
 @Injectable({
   providedIn: 'root'
@@ -29,7 +31,13 @@ export class FileService {
   }
   
 
-  requestMaterial(materialIDs: string[], materialType: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/request-material`, { materialIDs, materialType });
+  requestMaterial(materialIds: string[], materialType: string): Observable<any> {
+    const body = { materialIDs: materialIds, materialType };
+    return this.http.post(`${this.apiUrl}/request-material`, body).pipe(
+      map((response: any) => {
+        // Assuming your backend sends a response like { message: ..., studyMaterials: ... }
+        return response.studyMaterials; // Extract the studyMaterials property
+      })
+    );
   }
-}
+}  

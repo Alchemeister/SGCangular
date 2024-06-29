@@ -25,6 +25,7 @@ import { DomSanitizer } from '@angular/platform-browser';
   templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit {
+
   @ViewChild('fileInput') fileInput!: ElementRef;
 
   private _transformer = (node: FileNode, level: number): IFlatNode => {
@@ -252,24 +253,26 @@ export class DashboardComponent implements OnInit {
   requestMaterial() {
     console.log('Requesting material of type:', this.materialType);
     const selectedMaterials = this.getSelectedMaterialIds();
-
+  
     if (selectedMaterials.length === 0) {
       alert('Please select at least one material.');
       return;
     }
-
+  
     if (!this.materialType) {
       alert('Please select a material type.');
       return;
     }
-
+  
+    const body = { materialIDs: selectedMaterials, materialType: this.materialType };
+  
     this.fileService.requestMaterial(selectedMaterials, this.materialType).subscribe({
       next: (response: any) => {
         console.log('Study material response:', response);
-        if (response && response.studyMaterials && response.studyMaterials.trim() !== '') {
-          this.createAndShowModal(response.studyMaterials);
+        if (response) {
+          this.createAndShowModal(response); // Pass response directly
         } else {
-          console.error('Invalid or empty response:', response);
+          console.error('Invalid response:', response);
           alert('Error: No study material generated. Please try again.');
         }
         this.materialType = '';
@@ -278,7 +281,7 @@ export class DashboardComponent implements OnInit {
       error: (error) => {
         console.error('Error requesting study material:', error);
         let errorMessage = 'Error requesting study material. Please try again.';
-        if (error.status === 400 && error.error && error.error.message) {
+        if (error.error && error.error.message) {
           errorMessage = error.error.message;
         }
         alert(errorMessage);
