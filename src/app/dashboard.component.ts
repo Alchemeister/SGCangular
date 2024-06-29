@@ -296,101 +296,107 @@ export class DashboardComponent implements OnInit {
     if (existingModal) {
       existingModal.remove();
     }
-
+  
     const modalDiv = this.renderer.createElement('div');
     this.renderer.addClass(modalDiv, 'modal');
     this.renderer.addClass(modalDiv, 'fade');
     this.renderer.setAttribute(modalDiv, 'id', 'quizModal');
     this.renderer.setAttribute(modalDiv, 'tabindex', '-1');
-
+  
     const modalDialog = this.renderer.createElement('div');
     this.renderer.addClass(modalDialog, 'modal-dialog');
     this.renderer.addClass(modalDialog, 'modal-lg');
-
+  
     const modalContent = this.renderer.createElement('div');
     this.renderer.addClass(modalContent, 'modal-content');
-
+  
     const modalHeader = this.renderer.createElement('div');
     this.renderer.addClass(modalHeader, 'modal-header');
-
+  
     const modalTitle = this.renderer.createElement('h5');
     this.renderer.addClass(modalTitle, 'modal-title');
     this.renderer.appendChild(modalTitle, this.renderer.createText('Generated Quiz'));
-
+  
     const closeButton = this.renderer.createElement('button');
     this.renderer.setAttribute(closeButton, 'type', 'button');
     this.renderer.addClass(closeButton, 'btn-close');
     this.renderer.setAttribute(closeButton, 'data-bs-dismiss', 'modal');
-
+  
     const modalBody = this.renderer.createElement('div');
     this.renderer.addClass(modalBody, 'modal-body');
   
     // Create a temporary div to parse the HTML content
     const tempDiv = this.renderer.createElement('div');
-    tempDiv.innerHTML = content; // No need for bypassSecurityTrustHtml here
+    tempDiv.innerHTML = content;
   
     // Append each child node from the temporary div to the modal body
     while (tempDiv.firstChild) {
       modalBody.appendChild(tempDiv.firstChild);
-    } 
+    }
   
-  
-
-  // *** Add event listeners to radio buttons after setting innerHTML ***
-  const radioButtons = modalBody.querySelectorAll('input[type="radio"]');
-  radioButtons.forEach((radioButton: any) => {
-    const questionNumber = parseInt(radioButton.name.replace('q', ''), 10); // Extract question number
-    this.renderer.listen(radioButton, 'change', () => {
-      this.onAnswerSelect(questionNumber, radioButton.value);
+    // *** Add event listeners to radio buttons after setting innerHTML ***
+    const radioButtons = modalBody.querySelectorAll('input[type="radio"]');
+    radioButtons.forEach((radioButton: any) => {
+      const questionNumber = parseInt(radioButton.name.replace('q', ''), 10);
+      this.renderer.listen(radioButton, 'change', () => {
+        this.onAnswerSelect(questionNumber, radioButton.value);
+      });
     });
-  });
-
+  
+    // *** Create the modalFooter ***
+    const modalFooter = this.renderer.createElement('div');
+    this.renderer.addClass(modalFooter, 'modal-footer');
+  
+    // *** Create the scoreDisplay and append to modalFooter ***
+    const scoreDisplay = this.renderer.createElement('div');
+    this.renderer.setAttribute(scoreDisplay, 'id', 'quiz-score');
+    this.renderer.setStyle(scoreDisplay, 'display', 'none');
+    this.renderer.appendChild(modalFooter, scoreDisplay);
+  
+    // *** Create the submitButton and append to modalFooter ***
     const submitButton = this.renderer.createElement('button');
     this.renderer.addClass(submitButton, 'btn');
     this.renderer.addClass(submitButton, 'btn-primary');
     this.renderer.appendChild(submitButton, this.renderer.createText('Submit Quiz'));
     this.renderer.listen(submitButton, 'click', () => this.submitQuiz(modalBody));
-
-    const scoreDisplay = this.renderer.createElement('div');
-    this.renderer.setAttribute(scoreDisplay, 'id', 'quiz-score');
-    this.renderer.setStyle(scoreDisplay, 'display', 'none');
-
-    const modalFooter = this.renderer.createElement('div');
-    this.renderer.addClass(modalFooter, 'modal-footer');
-
-    const footerCloseButton = this.renderer.createElement('button');
-    this.renderer.setAttribute(footerCloseButton, 'type', 'button');
-    this.renderer.addClass(footerCloseButton, 'btn');
-    this.renderer.addClass(footerCloseButton, 'btn-secondary');
-    this.renderer.setAttribute(footerCloseButton, 'data-bs-dismiss', 'modal');
-    this.renderer.appendChild(footerCloseButton, this.renderer.createText('Close'));
-
+    this.renderer.appendChild(modalFooter, submitButton);
+  
+    // *** Append elements to the modal structure ***
     this.renderer.appendChild(modalHeader, modalTitle);
     this.renderer.appendChild(modalHeader, closeButton);
     this.renderer.appendChild(modalContent, modalHeader);
     this.renderer.appendChild(modalContent, modalBody);
-    this.renderer.appendChild(modalFooter, submitButton);
-    this.renderer.appendChild(modalFooter, scoreDisplay);
-    this.renderer.appendChild(modalFooter, footerCloseButton);
-    this.renderer.appendChild(modalContent, modalFooter);
+    this.renderer.appendChild(modalContent, modalFooter); // Append modalFooter here
     this.renderer.appendChild(modalDialog, modalContent);
     this.renderer.appendChild(modalDiv, modalDialog);
-
+  
+    // *** Now append the fully constructed modalDiv to the document.body ***
     this.renderer.appendChild(this.document.body, modalDiv);
-
+  
+    // Create and show the modal
     const modal = new Modal(modalDiv);
     modal.show();
-
+  
     modalDiv.addEventListener('hidden.bs.modal', () => {
       this.renderer.removeChild(this.document.body, modalDiv);
     });
   }
-
+  
   onAnswerSelect(questionNumber: number, selectedAnswer: string): void {
     this.userAnswers[questionNumber] = selectedAnswer;
     console.log('User Answers:', this.userAnswers);
   }
   
+  private highlightAnswer(answerElement: HTMLInputElement, color: string) {
+    
+    const answerLabel = answerElement.closest('label'); 
+  
+    if (answerLabel) {
+      answerLabel.style.backgroundColor = color; 
+    } else {
+      console.warn('Label not found for answer element:', answerElement);
+    }
+  }
 
   private submitQuiz(quizElement: HTMLElement) { 
     const questions = quizElement.querySelectorAll('ol > li');
@@ -405,32 +411,38 @@ export class DashboardComponent implements OnInit {
     let score = 0;
   
     questions.forEach((question, index) => {
-      const selectedAnswer = question.querySelector('input[type="radio"]:checked');
+      const selectedAnswer = question.querySelector('input[type="radio"]:checked') as HTMLInputElement | null;
+    
       if (selectedAnswer) {
         const questionNumber = index + 1;
-        const userAnswer = (selectedAnswer as HTMLInputElement).value;
+        const userAnswer = selectedAnswer.value; // Use .value directly on selectedAnswer
         const match = answerKey.textContent?.match(new RegExp(`${questionNumber}\\. (\\w)`));
-        const correctAnswer = match ? match[1] : null;
-  
-        if (userAnswer === correctAnswer) {
+        const correctAnswerValue = match ? match[1] : null;
+    
+        
+        const correctAnswerElement = question.querySelector(`input[type="radio"][value="${correctAnswerValue}"]`) as HTMLInputElement;
+    
+        if (userAnswer === correctAnswerValue) { // Compare userAnswer directly
           score++;
+          this.highlightAnswer(selectedAnswer, 'green');
+        } else {
+          this.highlightAnswer(selectedAnswer, 'red');
+          if (correctAnswerElement) {
+            this.highlightAnswer(correctAnswerElement, 'green');
+          }
         }
       }
     });
   
-    const scoreDisplay = quizElement.querySelector('#quiz-score') as HTMLElement;
-    if (scoreDisplay) {
-      scoreDisplay.textContent = `Your score: ${score} out of ${totalQuestions}`;
-      scoreDisplay.style.display = 'block';
-    } else {
-      console.error('Score display element not found');
-      const newScoreDisplay = this.renderer.createElement('div');
-      this.renderer.setAttribute(newScoreDisplay, 'id', 'quiz-score');
-      this.renderer.setProperty(newScoreDisplay, 'textContent', `Your score: ${score} out of ${totalQuestions}`);
-      this.renderer.setStyle(newScoreDisplay, 'display', 'block');
-      this.renderer.appendChild(quizElement, newScoreDisplay);
-    }
-  } // <-- Closing brace for submitQuiz method
+    const scoreDisplay = document.getElementById('quiz-score') as HTMLElement;
+
+  if (scoreDisplay) {
+    scoreDisplay.textContent = `Your score: ${score} out of ${totalQuestions}`;
+    scoreDisplay.style.display = 'block';
+  } else {
+    console.error('Score display element not found');
+  }
+}
   
   private resetForm() {
     this.selectedFile = null;
