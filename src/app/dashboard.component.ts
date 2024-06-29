@@ -25,6 +25,7 @@ import { DomSanitizer } from '@angular/platform-browser';
   templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit {
+  userAnswers: { [questionNumber: number]: string } = {}; 
 
   @ViewChild('fileInput') fileInput!: ElementRef;
 
@@ -323,7 +324,26 @@ export class DashboardComponent implements OnInit {
 
     const modalBody = this.renderer.createElement('div');
     this.renderer.addClass(modalBody, 'modal-body');
-    this.renderer.setProperty(modalBody, 'innerHTML', this.sanitizer.sanitize(SecurityContext.HTML, content));
+  
+    // Create a temporary div to parse the HTML content
+    const tempDiv = this.renderer.createElement('div');
+    tempDiv.innerHTML = content; // No need for bypassSecurityTrustHtml here
+  
+    // Append each child node from the temporary div to the modal body
+    while (tempDiv.firstChild) {
+      modalBody.appendChild(tempDiv.firstChild);
+    } 
+  
+  
+
+  // *** Add event listeners to radio buttons after setting innerHTML ***
+  const radioButtons = modalBody.querySelectorAll('input[type="radio"]');
+  radioButtons.forEach((radioButton: any) => {
+    const questionNumber = parseInt(radioButton.name.replace('q', ''), 10); // Extract question number
+    this.renderer.listen(radioButton, 'change', () => {
+      this.onAnswerSelect(questionNumber, radioButton.value);
+    });
+  });
 
     const submitButton = this.renderer.createElement('button');
     this.renderer.addClass(submitButton, 'btn');
@@ -366,18 +386,24 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  private submitQuiz(quizElement: HTMLElement) {
+  onAnswerSelect(questionNumber: number, selectedAnswer: string): void {
+    this.userAnswers[questionNumber] = selectedAnswer;
+    console.log('User Answers:', this.userAnswers);
+  }
+  
+
+  private submitQuiz(quizElement: HTMLElement) { 
     const questions = quizElement.querySelectorAll('ol > li');
     const answerKey = quizElement.querySelector('#answer-key');
-
+  
     if (!answerKey) {
       console.error('Answer key not found in the quiz');
       return;
     }
-
+  
     let totalQuestions = questions.length;
     let score = 0;
-
+  
     questions.forEach((question, index) => {
       const selectedAnswer = question.querySelector('input[type="radio"]:checked');
       if (selectedAnswer) {
@@ -385,13 +411,13 @@ export class DashboardComponent implements OnInit {
         const userAnswer = (selectedAnswer as HTMLInputElement).value;
         const match = answerKey.textContent?.match(new RegExp(`${questionNumber}\\. (\\w)`));
         const correctAnswer = match ? match[1] : null;
-
+  
         if (userAnswer === correctAnswer) {
           score++;
         }
       }
     });
-
+  
     const scoreDisplay = quizElement.querySelector('#quiz-score') as HTMLElement;
     if (scoreDisplay) {
       scoreDisplay.textContent = `Your score: ${score} out of ${totalQuestions}`;
@@ -404,11 +430,11 @@ export class DashboardComponent implements OnInit {
       this.renderer.setStyle(newScoreDisplay, 'display', 'block');
       this.renderer.appendChild(quizElement, newScoreDisplay);
     }
-  }
-
+  } // <-- Closing brace for submitQuiz method
+  
   private resetForm() {
     this.selectedFile = null;
     this.selectedParentFolderId = '';
     this.subjectTag = '';
   }
-}
+ }
