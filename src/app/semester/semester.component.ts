@@ -7,7 +7,7 @@ import { FileService } from '../file.service';
 import { Semester } from '../models/semester.model';
 import { ClassList } from '../models/class-list.model';
 import { Chapter } from '../models/chapter.model';
-
+import { SelectedMaterialService } from '../../app/selected-material.service';
 @Component({
   selector: 'app-semester',
   standalone: true,
@@ -35,7 +35,8 @@ export class SemesterComponent implements OnInit {
 
   constructor(
     private fileService: FileService,
-    private cdRef: ChangeDetectorRef
+    private cdRef: ChangeDetectorRef,
+    private selectedMaterialService: SelectedMaterialService
   ) {
     this.semesters$ = this.fileService.semesters$;
     this.classLists$ = this.fileService.classLists$;
@@ -49,12 +50,15 @@ export class SemesterComponent implements OnInit {
   onItemSelect(event: Event, type: 'semester' | 'classList' | 'chapter' | 'file', id: string | undefined): void {
     if (!id) return;
     const checkbox = event.target as HTMLInputElement;
+  
     if (type === 'file') {
       const currentSelectedFileIds = this.selectedFileIds$.value;
       if (checkbox.checked) {
         this.selectedFileIds$.next([...currentSelectedFileIds, id]);
+        this.selectedMaterialService.addSelectedMaterial(id);
       } else {
         this.selectedFileIds$.next(currentSelectedFileIds.filter(fileId => fileId !== id));
+        this.selectedMaterialService.removeSelectedMaterial(id);
       }
     } else if (type === 'chapter') {
       const currentSelectedChapterIds = this.selectedChapterIds$.value;
@@ -65,6 +69,7 @@ export class SemesterComponent implements OnInit {
       }
     }
   }
+  
 
   triggerFileUpload(): void {
     this.isExactlyOneChapterSelected().pipe(take(1)).subscribe(isOneChapterSelected => {

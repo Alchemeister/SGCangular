@@ -5,6 +5,8 @@ import { HttpClientModule } from '@angular/common/http';
 import { AppComponent } from './app.component';
 // Import other components as needed
 
+import { SelectedMaterialService } from './selected-material.service';
+
 @NgModule({
   declarations: [
     AppComponent,
@@ -15,7 +17,7 @@ import { AppComponent } from './app.component';
     HttpClientModule,
     // other modules...
   ],
-  providers: [],
+  providers: [SelectedMaterialService],
   bootstrap: [AppComponent]
 })
 export class AppModule { }

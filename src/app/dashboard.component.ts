@@ -60,6 +60,7 @@ export class DashboardComponent {
     this.selectedMaterialService.selectedMaterials$.pipe(
       take(1),
       switchMap(selectedMaterials => {
+        console.log('Selected materials before request:', selectedMaterials); // Added this line
         if (selectedMaterials.length === 0) {
           alert('Please select at least one material.');
           return EMPTY;
@@ -72,7 +73,7 @@ export class DashboardComponent {
   
         return this.fileService.requestMaterial(selectedMaterials, this.materialType);
       })
-    ).subscribe({
+    ).subscribe({  
       next: (response: any) => {
         console.log('Study material response:', response);
         if (response && response.studyMaterials) {
