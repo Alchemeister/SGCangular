@@ -1,0 +1,906 @@
+ UI/UX Improvements:
+
+Enhance the user interface to make it more intuitive and user-friendly.
+Consider using drag-and-drop for file uploads.
+Add progress indicators for file uploads and downloads.
+
+
+
+front end 
+dashboard.component.ts
+import { Component, OnInit, Renderer2, Inject, ViewChild, ElementRef, ChangeDetectorRef, SecurityContext } from '@angular/core';
+import { CommonModule, DOCUMENT } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { MatTreeModule, MatTreeFlatDataSource, MatTreeFlattener } from '@angular/material/tree';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { FlatTreeControl } from '@angular/cdk/tree';
+import { FileNode, IFlatNode } from './file-node.model';
+import { FileService } from './file.service';
+import { Modal } from 'bootstrap';
+import { DomSanitizer } from '@angular/platform-browser';
+import { SharedModule } from './shared/shared.module';
+
+
+
+@Component({
+  selector: 'app-dashboard',
+  standalone: true,
+  imports: [
+    CommonModule,
+    FormsModule,
+    MatTreeModule,
+    MatIconModule,
+    MatButtonModule,
+    SharedModule,
+    MatCheckboxModule
+  ],
+  templateUrl: './dashboard.component.html'
+})
+export class DashboardComponent implements OnInit {
+  userAnswers: { [questionNumber: number]: string } = {};
+
+
+  @ViewChild('fileInput') fileInput!: ElementRef;
+
+
+  private _transformer = (node: FileNode, level: number): IFlatNode => {
+    return {
+      expandable: !!node.children && node.children.length > 0,
+      name: node.name,
+      type: node.type,
+      level: level,
+      isSelected: node.isSelected ?? false,
+      _id: node._id,
+      path: node.path,
+      subjectTag: node.subjectTag,
+      parentFolder: node.parentFolder ?? null
+    };
+  }
+
+
+  treeControl = new FlatTreeControl<IFlatNode>(
+    node => node.level,
+    node => node.expandable
+  );
+
+
+  treeFlattener = new MatTreeFlattener(
+    this._transformer,
+    node => node.level,
+    node => node.expandable,
+    node => node.children
+  );
+
+
+  dataSource = new MatTreeFlatDataSource(this.treeControl, this.treeFlattener);
+
+
+  selectedFile: File | null = null;
+  selectedParentFolderId: string = '';
+  subjectTag: string = '';
+  materialType: string = '';
+  selectedNodeIds: string[] = []; // To store the IDs of selected nodes
+
+
+  constructor(
+    private fileService: FileService,
+    private renderer: Renderer2,
+    @Inject(DOCUMENT) private document: Document,
+    private sanitizer: DomSanitizer,
+    private changeDetectorRef: ChangeDetectorRef
+  ) {}
+
+
+  ngOnInit() {
+    this.fetchTreeData();
+  }
+
+
+  public triggerFileInput() {
+    this.fileInput.nativeElement.click();
+  }
+
+
+  public onFileSelected(event: any) {
+    const file: File = event.target.files[0];
+    if (file) {
+      this.uploadFile(file);
+      event.target.value = '';
+    }
+  }
+
+
+  uploadFile(file: File) {
+    const subjectTag = prompt('Enter subject tag:');
+    if (subjectTag) {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('subjectTag', subjectTag);
+
+
+      if (this.selectedParentFolderId && this.selectedParentFolderId.trim() !== '') {
+        formData.append('parentFolder', this.selectedParentFolderId);
+      }
+
+
+      this.fileService.uploadFile(formData).subscribe({
+        next: (response: any) => {
+          console.log('File uploaded:', response);
+          this.fetchTreeData();
+          this.resetForm();
+        },
+        error: (error) => {
+          console.error('Error uploading file:', error);
+          alert('Error uploading file. Please try again.');
+          this.fetchTreeData();
+        }
+      });
+    }
+  }
+
+
+  public hasChild = (_: number, node: IFlatNode) => node.expandable;
+
+
+  public onNodeSelected(node: IFlatNode) {
+    this.toggleNodeSelection(node);
+  }
+
+
+  toggleNodeSelection(node: IFlatNode): void {
+    node.isSelected = !node.isSelected;
+
+
+    // Update the selectedNodeIds array
+    if (node.isSelected) {
+      this.selectedNodeIds.push(node._id);
+    } else {
+      const index = this.selectedNodeIds.indexOf(node._id);
+      if (index > -1) {
+        this.selectedNodeIds.splice(index, 1);
+      }
+    }
+
+
+    this.updateParentSelection(node);
+    this.updateChildSelection(node);
+    this.changeDetectorRef.detectChanges();
+  }
+
+
+  fetchTreeData() {
+    this.fileService.getTreeData().subscribe({
+      next: (data: FileNode[]) => {
+        this.dataSource.data = this.preserveSelection(data); // Preserve selections
+        this.treeControl.dataNodes = this.treeFlattener.flattenNodes(this.dataSource.data);
+        this.treeControl.expandAll();
+        this.changeDetectorRef.detectChanges();
+      },
+      error: (error) => {
+        console.error('Error fetching tree data:', error);
+      }
+    });
+  }
+
+
+  private preserveSelection(newNodes: FileNode[]): FileNode[] {
+    return newNodes.map(newNode => ({
+      ...newNode,
+      isSelected: this.selectedNodeIds.includes(newNode._id), // Maintain selection
+      children: newNode.children ? this.preserveSelection(newNode.children) : []
+    }));
+  }
+
+
+  getSelectedMaterialIds(): string[] {
+    return this.selectedNodeIds;
+  }
+
+
+  createFolder(parentFolderId?: string) {
+    const folderName = prompt('Enter new folder name:');
+    if (!folderName) return;
+
+
+    this.fileService.createFolder(folderName, parentFolderId).subscribe({
+      next: (response: any) => {
+        console.log('Folder created:', response);
+        this.fetchTreeData();
+      },
+      error: (error) => {
+        console.error('Error creating folder:', error);
+        alert('Error creating folder. Please try again.');
+      }
+    });
+  }
+
+
+  private updateParentSelection(node: IFlatNode) {
+    const parent = this.getParentNode(node);
+    if (parent) {
+      parent.isSelected = this.descendantsAllSelected(parent);
+      this.updateParentSelection(parent);
+    }
+  }
+
+
+  private updateChildSelection(node: IFlatNode) {
+    if (node.expandable) {
+      this.treeControl.getDescendants(node).forEach(child => {
+        child.isSelected = node.isSelected;
+      });
+    }
+  }
+
+
+  private getParentNode(node: IFlatNode): IFlatNode | null {
+    const currentLevel = node.level;
+    if (currentLevel < 1) {
+      return null;
+    }
+    const startIndex = this.treeControl.dataNodes.indexOf(node) - 1;
+    for (let i = startIndex; i >= 0; i--) {
+      const currentNode = this.treeControl.dataNodes[i];
+      if (currentNode.level < currentLevel) {
+        return currentNode;
+      }
+    }
+    return null;
+  }
+
+
+  private descendantsAllSelected(node: IFlatNode): boolean {
+    const descendants = this.treeControl.getDescendants(node);
+    return descendants.every(child => child.isSelected);
+  }
+
+
+  deleteSelectedMaterials() {
+    console.log('Starting delete operation');
+    const materialIdsToDelete = this.getSelectedMaterialIds();
+    console.log('Materials to delete:', materialIdsToDelete);
+
+
+    if (materialIdsToDelete.length === 0) {
+      console.log('No materials selected for deletion');
+      alert('Please select materials to delete.');
+      return;
+    }
+
+
+    if (confirm('Are you sure you want to delete the selected materials?')) {
+      this.fileService.deleteSelectedMaterials(materialIdsToDelete)
+        .subscribe({
+          next: (response) => {
+            console.log('Materials deleted successfully', response);
+            alert('Selected materials have been deleted.');
+            this.fetchTreeData();
+          },
+          error: (error) => {
+            console.error('Error deleting materials:', error);
+            if (error.error && error.error.message) {
+              alert(`Error: ${error.error.message}`);
+            } else {
+              alert('Error deleting materials. Please try again.');
+            }
+            this.fetchTreeData();
+          }
+        });
+    }
+  }
+
+
+  refreshTreeData() {
+    this.fetchTreeData();
+  }
+
+
+  requestMaterial() {
+    console.log('Requesting material of type:', this.materialType);
+    const selectedMaterials = this.getSelectedMaterialIds();
+ 
+    if (selectedMaterials.length === 0) {
+      alert('Please select at least one material.');
+      return;
+    }
+ 
+    if (!this.materialType) {
+      alert('Please select a material type.');
+      return;
+    }
+ 
+    const body = { materialIDs: selectedMaterials, materialType: this.materialType };
+ 
+    this.fileService.requestMaterial(selectedMaterials, this.materialType).subscribe({
+      next: (response: any) => {
+        console.log('Study material response:', response);
+        if (response) {
+          this.createAndShowModal(response); // Pass response directly
+        } else {
+          console.error('Invalid response:', response);
+          alert('Error: No study material generated. Please try again.');
+        }
+        this.materialType = '';
+        this.fetchTreeData();
+      },
+      error: (error) => {
+        console.error('Error requesting study material:', error);
+        let errorMessage = 'Error requesting study material. Please try again.';
+        if (error.error && error.error.message) {
+          errorMessage = error.error.message;
+        }
+        alert(errorMessage);
+        this.fetchTreeData();
+      }
+    });
+  }
+
+
+  public createAndShowModal(content: string) {
+    const existingModal = this.document.getElementById('quizModal');
+    if (existingModal) {
+      existingModal.remove();
+    }
+ 
+    const modalDiv = this.renderer.createElement('div');
+    this.renderer.addClass(modalDiv, 'modal');
+    this.renderer.addClass(modalDiv, 'fade');
+    this.renderer.setAttribute(modalDiv, 'id', 'quizModal');
+    this.renderer.setAttribute(modalDiv, 'tabindex', '-1');
+ 
+    const modalDialog = this.renderer.createElement('div');
+    this.renderer.addClass(modalDialog, 'modal-dialog');
+    this.renderer.addClass(modalDialog, 'modal-lg');
+ 
+    const modalContent = this.renderer.createElement('div');
+    this.renderer.addClass(modalContent, 'modal-content');
+ 
+    const modalHeader = this.renderer.createElement('div');
+    this.renderer.addClass(modalHeader, 'modal-header');
+ 
+    const modalTitle = this.renderer.createElement('h5');
+    this.renderer.addClass(modalTitle, 'modal-title');
+    this.renderer.appendChild(modalTitle, this.renderer.createText('Generated Quiz'));
+ 
+    const closeButton = this.renderer.createElement('button');
+    this.renderer.setAttribute(closeButton, 'type', 'button');
+    this.renderer.addClass(closeButton, 'btn-close');
+    this.renderer.setAttribute(closeButton, 'data-bs-dismiss', 'modal');
+ 
+    const modalBody = this.renderer.createElement('div');
+    this.renderer.addClass(modalBody, 'modal-body');
+ 
+    // Create a temporary div to parse the HTML content
+    const tempDiv = this.renderer.createElement('div');
+    tempDiv.innerHTML = content;
+ 
+    // Append each child node from the temporary div to the modal body
+    while (tempDiv.firstChild) {
+      modalBody.appendChild(tempDiv.firstChild);
+    }
+ 
+    // *** Add event listeners to radio buttons after setting innerHTML ***
+    const radioButtons = modalBody.querySelectorAll('input[type="radio"]');
+    radioButtons.forEach((radioButton: any) => {
+      const questionNumber = parseInt(radioButton.name.replace('q', ''), 10);
+      this.renderer.listen(radioButton, 'change', () => {
+        this.onAnswerSelect(questionNumber, radioButton.value);
+      });
+    });
+ 
+    // *** Create the modalFooter ***
+    const modalFooter = this.renderer.createElement('div');
+    this.renderer.addClass(modalFooter, 'modal-footer');
+ 
+    // *** Create the scoreDisplay and append to modalFooter ***
+    const scoreDisplay = this.renderer.createElement('div');
+    this.renderer.setAttribute(scoreDisplay, 'id', 'quiz-score');
+    this.renderer.setStyle(scoreDisplay, 'display', 'none');
+    this.renderer.appendChild(modalFooter, scoreDisplay);
+ 
+    // *** Create the submitButton and append to modalFooter ***
+    const submitButton = this.renderer.createElement('button');
+    this.renderer.addClass(submitButton, 'btn');
+    this.renderer.addClass(submitButton, 'btn-primary');
+    this.renderer.appendChild(submitButton, this.renderer.createText('Submit Quiz'));
+    this.renderer.listen(submitButton, 'click', () => this.submitQuiz(modalBody));
+    this.renderer.appendChild(modalFooter, submitButton);
+ 
+    // *** Append elements to the modal structure ***
+    this.renderer.appendChild(modalHeader, modalTitle);
+    this.renderer.appendChild(modalHeader, closeButton);
+    this.renderer.appendChild(modalContent, modalHeader);
+    this.renderer.appendChild(modalContent, modalBody);
+    this.renderer.appendChild(modalContent, modalFooter);
+    this.renderer.appendChild(modalDialog, modalContent);
+    this.renderer.appendChild(modalDiv, modalDialog);
+ 
+    // *** Now append the fully constructed modalDiv to the document.body ***
+    this.renderer.appendChild(this.document.body, modalDiv);
+ 
+    // Create and show the modal
+    const modal = new Modal(modalDiv);
+    modal.show();
+ 
+    modalDiv.addEventListener('hidden.bs.modal', () => {
+      this.renderer.removeChild(this.document.body, modalDiv);
+    });
+  }
+ 
+  onAnswerSelect(questionNumber: number, selectedAnswer: string): void {
+    this.userAnswers[questionNumber] = selectedAnswer;
+    console.log('User Answers:', this.userAnswers);
+  }
+ 
+  private highlightAnswer(answerElement: HTMLInputElement, color: string) {
+   
+    const answerLabel = answerElement.closest('label');
+ 
+    if (answerLabel) {
+      answerLabel.style.backgroundColor = color;
+    } else {
+      console.warn('Label not found for answer element:', answerElement);
+    }
+  }
+
+
+  private submitQuiz(quizElement: HTMLElement) {
+    const questions = quizElement.querySelectorAll('ol > li');
+    const answerKey = quizElement.querySelector('#answer-key');
+ 
+    if (!answerKey) {
+      console.error('Answer key not found in the quiz');
+      return;
+    }
+ 
+    let totalQuestions = questions.length;
+    let score = 0;
+ 
+    questions.forEach((question, index) => {
+      const selectedAnswer = question.querySelector('input[type="radio"]:checked') as HTMLInputElement | null;
+   
+      if (selectedAnswer) {
+        const questionNumber = index + 1;
+        const userAnswer = selectedAnswer.value; // Use .value directly on selectedAnswer
+        const match = answerKey.textContent?.match(new RegExp(`${questionNumber}\\. (\\w)`));
+        const correctAnswerValue = match ? match[1] : null;
+   
+       
+        const correctAnswerElement = question.querySelector(`input[type="radio"][value="${correctAnswerValue}"]`) as HTMLInputElement;
+   
+        if (userAnswer === correctAnswerValue) { // Compare userAnswer directly
+          score++;
+          this.highlightAnswer(selectedAnswer, 'green');
+        } else {
+          this.highlightAnswer(selectedAnswer, 'red');
+          if (correctAnswerElement) {
+            this.highlightAnswer(correctAnswerElement, 'green');
+          }
+        }
+      }
+    });
+ 
+    const scoreDisplay = document.getElementById('quiz-score') as HTMLElement;
+
+
+  if (scoreDisplay) {
+    scoreDisplay.textContent = `Your score: ${score} out of ${totalQuestions}`;
+    scoreDisplay.style.display = 'block';
+  } else {
+    console.error('Score display element not found');
+  }
+}
+ 
+  private resetForm() {
+    this.selectedFile = null;
+    this.selectedParentFolderId = '';
+    this.subjectTag = '';
+  }
+ }
+
+
+semester.component.html
+<h3>Semesters</h3>
+
+
+<div *ngFor="let semester of semesters">
+  {{ semester.name }}
+  <ul>
+    <li *ngFor="let classList of classLists">
+      <span *ngIf="classList.semesterId === semester._id">
+        {{ classList.name }}
+        <input type="text" [(ngModel)]="newChapterName">
+        <button (click)="createChapter(classList._id)">Create Chapter</button>
+        <ul>
+          <li *ngFor="let chapter of classList.chapters">
+            {{ chapter.name }}
+            <input type="file" (change)="uploadFile($event)">
+            <ul>
+              <li *ngFor="let fileUploadId of chapter.fileUploadIds">
+                <span *ngIf="getFileDetails(fileUploadId) | async as fileDetails">
+                  {{ fileDetails.originalFilename }}
+                </span>
+              </li>
+            </ul>          
+          </li>
+        </ul>
+      </span>
+    </li>
+  </ul>
+</div>
+
+semester.component.ts
+import { Component, OnInit } from '@angular/core';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { catchError } from 'rxjs/operators';
+import { throwError } from 'rxjs';
+import { FileService } from '../file.service'; // Adjust the path if needed
+
+
+interface Semester {
+  _id: string;
+  userId: string;
+  name: string;
+}
+
+
+// Define the ClassList interface
+interface ClassList {
+  _id: string;
+  name: string;
+  semesterId: string;
+  fileUploadIds: string[];
+  chapters: Chapter[];
+}
+
+
+interface Chapter {
+  _id: any;
+  name: string;
+  fileUploadIds: string[];
+}
+
+
+
+@Component({
+  selector: 'app-semester',
+  templateUrl: './semester.component.html',
+  styleUrls: ['./semester.component.css']
+})
+export class SemesterComponent implements OnInit {
+  semesters: Semester[] = [];
+  classLists: ClassList[] = []; // Add a property to store class lists
+  newSemesterName = '';
+  selectedSemester: Semester | null = null;
+  newClassListName = '';
+  newChapterName = '';
+  newNoteName = '';
+  uploadedFiles: any[] = []
+
+
+
+  constructor(private http: HttpClient, private fileService: FileService) { }
+
+
+  ngOnInit(): void {
+    this.fetchSemesters();
+    this.fetchUploadedFiles(); // Fetch initially uploaded files
+  }
+
+
+
+  uploadFile(event: any) {
+    const file: File = event.target.files[0];
+    if (file) {
+      const formData = new FormData();
+      formData.append('file', file);
+
+
+      this.fileService.uploadFile(formData).subscribe(
+        (response: any) => {
+          console.log('File uploaded successfully:', response);
+          this.uploadedFiles.push(response.fileNode); // Add to uploadedFiles array
+          this.fetchUploadedFiles(); // Refresh the list after upload
+        },
+        (error) => {
+          console.error('Error uploading file:', error);
+          // Handle the error appropriately
+        }
+      );
+    }
+  }
+
+
+
+  fetchUploadedFiles() {
+    this.fileService.getUploadedFiles().subscribe( // Assuming a new backend endpoint
+      (files: any[]) => {
+        this.uploadedFiles = files;
+      },
+      (error) => {
+        console.error('Error fetching uploaded files:', error);
+      }
+    );
+  }
+ 
+
+
+
+
+  fetchSemesters() {
+    this.http.get<Semester[]>('http://localhost:3000/api/files/semesters')
+      .pipe(catchError(this.handleError))
+      .subscribe((semesters) => {
+        this.semesters = semesters;
+
+
+        // Fetch class lists for EACH semester
+        this.semesters.forEach(semester => {
+          this.fetchClassLists(semester._id);
+        });
+      },
+      (error) => {
+        console.error('Error fetching semesters:', error);
+      });
+  }
+
+
+  fetchClassLists(semesterId: string) {
+    this.http.get<ClassList[]>(`http://localhost:3000/api/files/semesters/${semesterId}/class-lists`)
+      .pipe(catchError(this.handleError))
+      .subscribe((classLists) => {
+        this.classLists = classLists;
+      },
+      (error) => {
+        console.error('Error fetching class lists:', error);
+      });
+  }
+ 
+
+
+  createSemester() {
+    if (this.newSemesterName.trim() !== '') {
+      this.http.post<Semester>('http://localhost:3000/api/files/semesters', { name: this.newSemesterName })
+        .pipe(
+          catchError(this.handleError)
+        )
+        .subscribe(
+          (createdSemester) => {
+            this.semesters.push(createdSemester);
+            this.newSemesterName = '';
+          },
+          (error) => {
+            console.error('Error creating semester:', error);
+          }
+        );
+    }
+  }
+
+
+  createClassList(semesterId: string) {
+    if (this.newClassListName.trim() !== '') {
+      this.http.post<ClassList>('http://localhost:3000/api/files/class-lists', {
+        name: this.newClassListName,
+        semesterId: semesterId
+      })
+      .pipe(catchError(this.handleError))
+      .subscribe((createdClassList) => {
+        this.classLists.push(createdClassList); // Add the new class list to the array
+        this.newClassListName = ''; // Clear the input field
+      },
+      (error) => {
+        console.error('Error creating class list:', error);
+      });
+    }
+  }
+ 
+  createChapter(classListId: string) {
+    if (this.newChapterName.trim() !== '') {
+      this.http.post<Chapter>(`http://localhost:3000/api/files/class-lists/${classListId}/chapters`, {
+        name: this.newChapterName
+      })
+      .pipe(catchError(this.handleError))
+      .subscribe((createdChapter) => {
+        // Assuming your ClassList interface now has a 'chapters' property:
+        const classListToUpdate = this.classLists.find(cl => cl._id === classListId);
+        if (classListToUpdate) {
+          classListToUpdate.chapters.push(createdChapter);
+        }
+        this.newChapterName = '';
+      },
+      (error) => {
+        console.error('Error creating chapter:', error);
+      });
+    }
+  }
+
+
+ // New public method to get file details
+  getFileDetails(fileUploadId: string) {
+  return this.fileService.getFileDetails(fileUploadId);
+}
+ 
+  private handleError(error: HttpErrorResponse) {
+    if (error.error instanceof ErrorEvent) {
+      // A client-side or network error occurred. Handle it accordingly.
+      console.error('An error occurred:', error.error.message);
+    } else {
+      // The backend returned an unsuccessful response code.
+      // The response body may contain clues as to what went wrong.
+      console.error(
+        `Backend returned code ${error.status}, ` +
+        `body was: ${error.error}`);
+    }
+    // Return an observable with a user-facing error message.
+    return throwError('Something bad happened; please try again later.');
+  }
+}
+
+file.service.ts
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { FileNode } from './file-node.model';
+import { map } from 'rxjs/operators';
+
+
+@Injectable({
+  providedIn: 'root'
+})
+export class FileService {
+  private apiUrl = 'http://localhost:3000/api'; // Adjust this to your API URL
+
+
+  constructor(private http: HttpClient) {}
+
+
+  getTreeData(): Observable<FileNode[]> {
+    return this.http.get<FileNode[]>(`${this.apiUrl}/files/tree`);
+  }
+
+
+  getFileDetails(fileUploadId: string): Observable<any> { // Adjust return type if needed
+    return this.http.get(`${this.apiUrl}/files/${fileUploadId}`); // Adjust the API endpoint
+  }
+
+
+  getUploadedFiles(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/files/uploaded-files`);
+  }
+
+
+
+  uploadFile(formData: FormData): Observable<any> {
+    return this.http.post(`${this.apiUrl}/files/upload`, formData);
+  }
+
+
+  createFolder(name: string, parentFolder?: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/files/folders`, { name, parentFolder });
+  }
+
+
+  deleteSelectedMaterials(materialIds: string[]): Observable<any> {
+    console.log('Sending delete request with materialIds:', materialIds);
+    return this.http.post('/api/files/delete-materials', { materialIds });
+  }
+ 
+
+
+  requestMaterial(materialIds: string[], materialType: string): Observable<any> {
+    const body = { materialIDs: materialIds, materialType };
+    return this.http.post(`${this.apiUrl}/request-material`, body).pipe(
+      map((response: any) => {
+        // Assuming your backend sends a response like { message: ..., studyMaterials: ... }
+        return response.studyMaterials; // Extract the studyMaterials property
+      })
+    );
+  }
+}  
+
+file-node.model.ts
+export interface FileNode {
+  _id: string;
+  name: string;
+  type: 'file' | 'folder';
+  path: string;
+  parentFolder?: string | null;
+  children?: FileNode[];
+  subjectTag?: string;
+  isSelected?: boolean;
+}
+
+
+export interface IFlatNode {
+  expandable: boolean;
+  name: string;
+  type: 'file' | 'folder';
+  level: number;
+  isSelected: boolean;
+  _id: string;
+  path?: string;
+  subjectTag?: string;
+  parentFolder?: string | null;
+}
+
+shared.module.ts
+import { NgModule } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { SemesterComponent } from '../semester/semester.component';
+import { FormsModule } from '@angular/forms';
+
+
+@NgModule({
+  declarations: [
+    SemesterComponent
+  ],
+  imports: [
+    CommonModule,
+    FormsModule
+  ],
+  exports: [
+    SemesterComponent
+  ]
+})
+export class SharedModule { }
+
+here is the complete directory structure
+## Directory Structure:
+
+├── SGCangular
+│   ├── .angular
+│   │   └── cache
+│   │       └── 18.0.5
+│   │           ├── SGCangular
+│   ├── .editorconfig
+│   ├── .git
+│   ├── .gitignore
+│   ├── .vscode
+│   │   ├── extensions.json
+│   │   ├── launch.json
+│   │   └── tasks.json
+│   ├── README.md
+│   ├── angular.json
+│   ├── node_modules
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── proxy.conf.json
+│   ├── public
+│   │   └── favicon.ico
+│   ├── src
+│   │   ├── app
+│   │   │   ├── app.component.css
+│   │   │   ├── app.component.html
+│   │   │   ├── app.component.spec.ts
+│   │   │   ├── app.component.ts
+│   │   │   ├── app.config.ts
+│   │   │   ├── app.module.ts
+│   │   │   ├── app.routes.ts
+│   │   │   ├── dashboard.component.css
+│   │   │   ├── dashboard.component.html
+│   │   │   ├── dashboard.component.ts
+│   │   │   ├── file-node.model.ts
+│   │   │   ├── file.service.ts
+│   │   │   ├── models
+│   │   │   │   └── quiz.model.ts
+│   │   │   ├── semester
+│   │   │   │   ├── semester.component.css
+│   │   │   │   ├── semester.component.html
+│   │   │   │   ├── semester.component.spec.ts
+│   │   │   │   └── semester.component.ts
+│   │   │   ├── shared
+│   │   │   │   └── shared.module.ts
+│   │   │   └── tree-wrapper.module.ts
+│   │   ├── environments
+│   │   │   └── environment.ts
+│   │   ├── index.html
+│   │   ├── main.ts
+│   │   └── styles.css
+│   ├── tsconfig.app.json
+│   └── tsconfig.spec.json
+└── sgcangularquikshot.txt
+
+

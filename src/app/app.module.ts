@@ -1,15 +1,19 @@
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { HttpClientModule } from '@angular/common/http';
+
 import { AppComponent } from './app.component';
-import { DashboardComponent } from './dashboard.component';
+// Import other components as needed
 
 @NgModule({
-  declarations: [AppComponent],
+  declarations: [
+    AppComponent,
+    // other components...
+  ],
   imports: [
-    BrowserModule, 
+    BrowserModule,
     HttpClientModule,
-    DashboardComponent
+    // other modules...
   ],
   providers: [],
   bootstrap: [AppComponent]
