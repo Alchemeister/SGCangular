@@ -6,5 +6,5 @@ export interface Chapter {
   _id: string;
   name: string;
   classListId: string;
-  fileUploadIds: string[];
+  fileUploadIds: File[];
 }

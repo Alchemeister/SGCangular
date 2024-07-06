@@ -83,9 +83,7 @@ export class FileService {
   }
 
   // Chapters
-  get chapters$(): Observable<Chapter[]> {
-    return this.chaptersSubject.asObservable();
-  }
+ 
 
   getChapters(classListId: string): Observable<Chapter[]> {
     return this.http.get<Chapter[]>(`${this.apiUrl}/files/class-lists/${classListId}/chapters`).pipe(
@@ -120,10 +118,17 @@ export class FileService {
 
   // Files
   uploadFiles(formData: FormData): Observable<any> {
+    // Add the original file name to the formData
+    const files = formData.getAll('files') as File[];
+    files.forEach((file, index) => {
+      formData.append(`originalNames[${index}]`, file.name);
+    });
+  
     return this.http.post(`${this.apiUrl}/files/upload`, formData).pipe(
       catchError(this.handleError)
     );
   }
+  
 
   getFileDetails(fileId: string): Observable<File | null> {
     return this.http.get<File>(`${this.apiUrl}/files/${fileId}`).pipe(
@@ -167,5 +172,9 @@ export class FileService {
 
   get classLists$(): Observable<ClassList[]> {
     return this.classListsSubject.asObservable();
+  }
+
+  get chapters$(): Observable<Chapter[]> {
+    return this.chaptersSubject.asObservable();
   }
 }

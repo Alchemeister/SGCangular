@@ -22,33 +22,21 @@
                   <input type="checkbox" [value]="chapter._id" (change)="onItemSelect($event, 'chapter', chapter._id)">
                   {{ chapter.name }}
                   <ul *ngIf="chapter.fileUploadIds && chapter.fileUploadIds.length > 0">
-                    <li *ngFor="let fileId of chapter.fileUploadIds">
+                    <li *ngFor="let file of chapter.fileUploadIds">
                       <input type="checkbox"
-                             [value]="fileId"
-                             [checked]="(selectedFileIds$ | async)?.includes(fileId)"
-                             (change)="onItemSelect($event, 'file', fileId)">
-                      {{ fileId }} <!-- You might want to fetch and display actual file names -->
+                             [value]="file._id"
+                             [checked]="(selectedFileIds$ | async)?.includes(file._id)"
+                             (change)="onItemSelect($event, 'file', file._id)">
+                      {{ file.originalFilename }}
                     </li>
-                  </ul>
+                  </ul>                  
                   <ng-container *ngIf="!chapter.fileUploadIds || chapter.fileUploadIds.length === 0">
                     <p>No files uploaded for this chapter.</p>
                   </ng-container>
                 </li>
               </ng-container>
-              <li>
-                <form (ngSubmit)="createChapter(classList._id)">
-                  <input type="text" [(ngModel)]="newChapterName" name="newChapterName" placeholder="Enter chapter name">
-                  <button type="submit">Create Chapter</button>
-                </form>
-              </li>
             </ul>
           </span>
-        </li>
-        <li>
-          <form (ngSubmit)="createClassList(semester?._id)">
-            <input type="text" [(ngModel)]="newClassListName" name="newClassListName" placeholder="Enter class list name">
-            <button type="submit">Create Class List</button>
-          </form>
         </li>
       </ul>
     </li>
@@ -65,7 +53,17 @@
   <button (click)="triggerFileUpload()" [disabled]="!(isExactlyOneChapterSelected() | async)">
     Upload File
   </button>
-  <button (click)="deleteSelectedItems()" [disabled]="(selectedFileIds$ | async)?.length === 0 && (selectedChapterIds$ | async)?.length === 0">
-    Delete Selected
+  <button (click)="deleteSelectedItems()" 
+        [disabled]="(selectedSemesterIds$ | async)?.length === 0 && 
+                    (selectedClassListIds$ | async)?.length === 0 && 
+                    (selectedChapterIds$ | async)?.length === 0 && 
+                    (selectedFileIds$ | async)?.length === 0">
+  Delete Selected
+</button>
+  <button (click)="createClassList()" [disabled]="!(isExactlyOneSemesterSelected$ | async)">
+    Create Class List
   </button>
+  <button (click)="createChapter()" [disabled]="!(isExactlyOneClassListSelected$ | async)">
+    Create Chapter
+  </button>  
 </div>
