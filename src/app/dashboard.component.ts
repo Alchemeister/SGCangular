@@ -60,7 +60,7 @@ export class DashboardComponent {
     this.selectedMaterialService.selectedMaterials$.pipe(
       take(1),
       switchMap(selectedMaterials => {
-        console.log('Selected materials before request:', selectedMaterials); // Added this line
+        console.log('Selected materials before request:', selectedMaterials);
         if (selectedMaterials.length === 0) {
           alert('Please select at least one material.');
           return EMPTY;
@@ -94,6 +94,7 @@ export class DashboardComponent {
       }
     });
   }
+  
   
 
   public createAndShowModal(content: string) {
