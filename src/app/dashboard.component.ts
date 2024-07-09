@@ -1,9 +1,8 @@
-import { Component, ViewChild, ElementRef, Inject, Renderer2 } from '@angular/core';
+import { Component, ViewChild, ElementRef, Inject, Renderer2, OnInit } from '@angular/core';
 import { CommonModule, DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SemesterComponent } from '../app/semester/semester.component';
 import { Chapter } from '../app/models/chapter.model';
-import { MatButtonModule } from '@angular/material/button';
 import { FileService } from '../app/file.service';
 import { DomSanitizer } from '@angular/platform-browser';
 import { Modal } from 'bootstrap';
@@ -19,12 +18,12 @@ import { take, switchMap } from 'rxjs/operators';
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
-export class DashboardComponent {
+export class DashboardComponent implements OnInit {
   
-  userAnswers: { [questionNumber: number]: string } = {};
+  userAnswers: Record<number, string> = {};
  chapters: Chapter[] = [];
-  materialType: string = ''; 
-  classListId: string = '';
+  materialType = ''; 
+  classListId = '';
   
   @ViewChild('fileInput') fileInput!: ElementRef;
 
@@ -213,7 +212,7 @@ export class DashboardComponent {
       return;
     }
   
-    let totalQuestions = questions.length;
+    const totalQuestions = questions.length;
     let score = 0;
   
     questions.forEach((question, index) => {
