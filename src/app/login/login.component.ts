@@ -2,7 +2,9 @@ import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { UserService } from '../user.service';
 import { User } from '../models/user';
+import { AuthResponse } from '../models/auth-response';
 import { FormsModule } from '@angular/forms';
+import { switchMap } from 'rxjs/operators';
 
 @Component({
   selector: 'app-login',
@@ -23,8 +25,12 @@ export class LoginComponent {
   onSubmit() {
     this.userService.loginUser(this.user)
       .subscribe({
-        next: (response) => {
+        next: (response: AuthResponse) => {
           console.log('Login successful:', response);
+
+          // Store JWT in local storage
+          localStorage.setItem('jwtToken', response.token);
+
           this.router.navigate(['/dashboard']);
         },
         error: (error) => {

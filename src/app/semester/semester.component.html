@@ -8,43 +8,54 @@
 
   <ul>
     <li *ngFor="let semester of semesters$ | async">
-      <input type="checkbox" [value]="semester?._id" (change)="onItemSelect($event, 'semester', semester?._id)">
-      <a href="#" (click)="onSemesterSelect(semester?._id)">{{ semester?.name }}</a>
+      <input type="checkbox" [value]="semester._id" (change)="onItemSelect($event, 'semester', semester._id)">
+      <span class="semester-name">
+        {{ semester.name }} 
+        <button class="expand-button" (click)="onSemesterSelect(semester._id, $event)">
+          <span class="plus-sign" *ngIf="(selectedSemesterId$ | async) !== semester._id">+</span>
+          <span class="minus-sign" *ngIf="(selectedSemesterId$ | async) === semester._id">-</span>
+        </button>
+      </span>
 
-      <ul *ngIf="(selectedSemesterId$ | async) === semester?._id">
+      <ul *ngIf="(selectedSemesterId$ | async) === semester._id">
         <li *ngFor="let classList of classLists$ | async">
-          <input type="checkbox" [value]="classList?._id" (change)="onItemSelect($event, 'classList', classList?._id)">
-          <span>
-            <a href="#" (click)="onClassListSelect(classList)">{{ classList?.name }}</a>
-            <ul *ngIf="(selectedClassListId$ | async) === classList?._id">
-              <ng-container *ngIf="(chapters$ | async) as chapters">
-                <li *ngFor="let chapter of chapters">
-                  <input type="checkbox" [value]="chapter._id" (change)="onItemSelect($event, 'chapter', chapter._id)">
-                  {{ chapter.name }}
-                  <ul *ngIf="chapter.fileUploadIds && chapter.fileUploadIds.length > 0">
-                    <li *ngFor="let file of chapter.fileUploadIds">
-                      <input type="checkbox"
-                             [value]="file._id"
-                             [checked]="(selectedFileIds$ | async)?.includes(file._id)"
-                             (change)="onItemSelect($event, 'file', file._id)">
-                      {{ file.originalFilename }}
-                    </li>
-                  </ul>                  
-                  <ng-container *ngIf="!chapter.fileUploadIds || chapter.fileUploadIds.length === 0">
-                    <p>No files uploaded for this chapter.</p>
-                  </ng-container>
-                </li>
-              </ng-container>
-            </ul>
+          <input type="checkbox" [value]="classList._id" (change)="onItemSelect($event, 'classList', classList._id)">
+          <span class="class-list-name"> 
+            {{ classList.name }} 
+            <button class="btn btn-link btn-sm expand-button" (click)="onClassListSelect(classList, $event)">
+              <span class="plus-sign" *ngIf="(selectedClassListId$ | async) !== classList._id">+</span>
+              <span class="minus-sign" *ngIf="(selectedClassListId$ | async) === classList._id">-</span>
+            </button>
           </span>
+
+          <!-- Chapters Display -->
+          <ul *ngIf="(selectedClassListId$ | async) === classList._id"> 
+            <li *ngFor="let chapter of chapters$ | async">
+              <input type="checkbox" [value]="chapter._id" (change)="onItemSelect($event, 'chapter', chapter._id)">
+              {{ chapter.name }}
+
+              <ul *ngIf="chapter.fileUploadIds && chapter.fileUploadIds.length > 0">
+                <li *ngFor="let file of chapter.fileUploadIds">
+                  <input type="checkbox"
+                         [value]="file._id"
+                         [checked]="(selectedFileIds$ | async)?.includes(file._id)"
+                         (change)="onItemSelect($event, 'file', file._id)">
+                  {{ file.originalFilename }}
+                </li>
+              </ul>                  
+              <ng-container *ngIf="!chapter.fileUploadIds || chapter.fileUploadIds.length === 0">
+                <p>No files uploaded for this chapter.</p>
+              </ng-container>
+            </li> 
+          </ul> 
         </li>
       </ul>
     </li>
   </ul>
 </div>
 
-<div>
-  <input
+<div> 
+  <input 
     type="file"
     #fileInput
     style="display: none;"

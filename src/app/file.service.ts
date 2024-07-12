@@ -1,171 +1,220 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 import { Observable, throwError, of, BehaviorSubject } from 'rxjs';
 import { catchError, switchMap, tap } from 'rxjs/operators';
 import { Semester } from './models/semester.model';
 import { ClassList } from './models/class-list.model';
 import { Chapter } from './models/chapter.model';
+import { UserService } from './user.service';
 
+// Interfaces for API responses
+interface StudyMaterialResponse {
+  message: string;
+  studyMaterials: string;
+}
+
+interface DeleteMaterialsResponse {
+  message: string;
+  deletedPaths: string[];
+  errors?: string[];
+  remainingUploadCount: number;
+  remainingUploads: string[];
+}
+
+interface UploadResponse {
+  message: string;
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class FileService {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = '/api/files';
 
+  // BehaviorSubjects to manage application state
   private semestersSubject = new BehaviorSubject<Semester[]>([]);
   private classListsSubject = new BehaviorSubject<ClassList[]>([]);
   private chaptersSubject = new BehaviorSubject<Chapter[]>([]);
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private userService: UserService) {}
 
-  
-
-  
-
-
-  // Semesters
-  getSemesters(userId: string): Observable<Semester[]> {
-    return this.http.get<Semester[]>(`${this.apiUrl}/files/semesters?userId=${userId}`).pipe(
-      tap(semesters => this.semestersSubject.next(semesters)),
-      catchError(this.handleError)
-    );
+  // --- Semester Management ---
+  getSemesters(): Observable<Semester[]> {
+    const headers = this.userService.setAuthHeader();
+    return this.http.get<Semester[]>(`${this.apiUrl}/semesters`, { headers })
+      .pipe(
+        tap(semesters => {
+          this.semestersSubject.next(semesters); 
+        }),
+        catchError(this.handleError<Semester[]>('getSemesters', []))
+      );
   }
 
-  createSemester(name: string, userId: string): Observable<Semester> {
-    return this.http.post<Semester>(`${this.apiUrl}/files/semesters`, { name, userId }).pipe(
-      tap(newSemester => {
-        const currentSemesters = this.semestersSubject.value;
-        this.semestersSubject.next([...currentSemesters, newSemester]);
-      }),
-      catchError(this.handleError)
-    );
+  createSemester(name: string): Observable<Semester> {
+    const headers = this.userService.setAuthHeader();
+    return this.http.post<Semester>(`${this.apiUrl}/semesters`, { name }, { headers })
+      .pipe(
+        tap(newSemester => {
+          const currentSemesters = this.semestersSubject.value;
+          this.semestersSubject.next([...currentSemesters, newSemester]);
+        }),
+        catchError(this.handleError<Semester>('createSemester'))
+      );
   }
 
   deleteSemester(semesterId: string): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/files/semesters/${semesterId}`).pipe(
-      tap(() => {
-        const currentSemesters = this.semestersSubject.value;
-        this.semestersSubject.next(currentSemesters.filter(s => s._id !== semesterId));
-      }),
-      catchError(this.handleError)
-    );
+    const headers = this.userService.setAuthHeader();
+    return this.http.delete<void>(`${this.apiUrl}/semesters/${semesterId}`, { headers })
+      .pipe(
+        tap(() => {
+          const currentSemesters = this.semestersSubject.value;
+          this.semestersSubject.next(currentSemesters.filter(s => s._id !== semesterId));
+        }),
+        catchError(this.handleError<void>('deleteSemester'))
+      );
   }
 
-  // Class Lists
+  // --- Class List Management ---
   getClassLists(semesterId: string): Observable<ClassList[]> {
-    return this.http.get<ClassList[]>(`${this.apiUrl}/files/semesters/${semesterId}/class-lists`).pipe(
-      tap(classLists => this.classListsSubject.next(classLists)),
-      catchError(this.handleError)
-    );
+    const headers = this.userService.setAuthHeader();
+    return this.http.get<ClassList[]>(`${this.apiUrl}/semesters/${semesterId}/class-lists`, { headers })
+      .pipe(
+        tap(classLists => {
+          this.classListsSubject.next(classLists); 
+        }),
+        catchError(this.handleError<ClassList[]>('getClassLists', []))
+      );
   }
 
   createClassList(semesterId: string, name: string): Observable<ClassList> {
-    return this.http.post<ClassList>(`${this.apiUrl}/files/class-lists`, { name, semesterId }).pipe(
-      tap(newClassList => {
-        console.log('Created new class list:', newClassList);
-        // Update the class lists for the current semester
-        this.getClassLists(semesterId).subscribe();
-      }),
-      catchError(this.handleError)
-    );
+    const headers = this.userService.setAuthHeader();
+    return this.http.post<ClassList>(`${this.apiUrl}/semesters/${semesterId}/class-lists`, { name }, { headers })
+      .pipe(
+        tap(newClassList => {
+          const currentClassLists = this.classListsSubject.value;
+          this.classListsSubject.next([...currentClassLists, newClassList]);
+        }),
+        catchError(this.handleError<ClassList>('createClassList'))
+      );
   }
-  
 
   deleteClassList(classListId: string): Observable<void> {
-    return this.http.delete<void>(`${this.apiUrl}/files/class-lists/${classListId}`).pipe(
-      tap(() => {
-        const currentClassLists = this.classListsSubject.value;
-        this.classListsSubject.next(currentClassLists.filter(cl => cl._id !== classListId));
-      }),
-      catchError(this.handleError)
-    );
+    const headers = this.userService.setAuthHeader();
+    return this.http.delete<void>(`${this.apiUrl}/class-lists/${classListId}`, { headers })
+      .pipe(
+        tap(() => {
+          const currentClassLists = this.classListsSubject.value;
+          this.classListsSubject.next(currentClassLists.filter(cl => cl._id !== classListId));
+        }),
+        catchError(this.handleError<void>('deleteClassList'))
+      );
   }
 
-  // Chapters
- 
-
+  // --- Chapter Management ---
   getChapters(classListId: string): Observable<Chapter[]> {
-    return this.http.get<Chapter[]>(`${this.apiUrl}/files/class-lists/${classListId}/chapters`).pipe(
-      tap(chapters => {
-        console.log('Fetched chapters:', chapters);
-        this.chaptersSubject.next(chapters);
-      }),
-      catchError(this.handleError)
-    );
+    const headers = this.userService.setAuthHeader();
+    return this.http.get<Chapter[]>(`${this.apiUrl}/class-lists/${classListId}/chapters`, { headers })
+      .pipe(
+        tap(chapters => {
+          this.chaptersSubject.next(chapters);
+        }),
+        catchError(this.handleError<Chapter[]>('getChapters', []))
+      );
   }
-  
-  
 
   createChapter(classListId: string, chapterName: string): Observable<Chapter[]> {
-    return this.http.post<Chapter>(`${this.apiUrl}/files/class-lists/${classListId}/chapters`, { name: chapterName }).pipe(
-      switchMap(newChapter => {
-        console.log('Created new chapter:', newChapter);
-        return this.getChapters(classListId);
-      }),
-      catchError(this.handleError)
-    );
-  }
-  
-  
-
-
-  deleteChapter(chapterId: string): Observable<any> {
-    return this.http.delete(`${this.apiUrl}/files/chapters/${chapterId}`).pipe(
-      catchError(this.handleError)
-    );
+    const headers = this.userService.setAuthHeader();
+    return this.http.post<Chapter>(`${this.apiUrl}/class-lists/${classListId}/chapters`, { name: chapterName }, { headers })
+      .pipe(
+        switchMap(newChapter => {
+          return this.getChapters(classListId);
+        }),
+        catchError(this.handleError<Chapter[]>('createChapter', []))
+      );
   }
 
-  // Files
-  uploadFiles(formData: FormData): Observable<any> {
-    // Add the original file name to the formData
+  deleteChapter(chapterId: string): Observable<void> {
+    const headers = this.userService.setAuthHeader();
+    return this.http.delete<void>(`${this.apiUrl}/chapters/${chapterId}`, { headers })
+      .pipe(
+        tap(() => {
+          const currentChapters = this.chaptersSubject.value;
+          this.chaptersSubject.next(currentChapters.filter(ch => ch._id !== chapterId));
+        }),
+        catchError(this.handleError<void>('deleteChapter'))
+      );
+  }
+
+  // --- File Management --- 
+  uploadFiles(formData: FormData): Observable<UploadResponse> {
+    const headers = this.userService.setAuthHeader();
     const files = formData.getAll('files') as File[];
     files.forEach((file, index) => {
       formData.append(`originalNames[${index}]`, file.name);
     });
   
-    return this.http.post(`${this.apiUrl}/files/upload`, formData).pipe(
-      catchError(this.handleError)
-    );
+    return this.http.post<UploadResponse>(`${this.apiUrl}/upload`, formData, { headers })
+      .pipe(
+        catchError(this.handleError<UploadResponse>('uploadFiles', { message: 'Upload failed' }))
+      );
   }
   
 
   getFileDetails(fileId: string): Observable<File | null> {
-    return this.http.get<File>(`${this.apiUrl}/files/${fileId}`).pipe(
-      catchError(error => {
-        if (error.status === 404) {
-          console.warn(`File with ID ${fileId} not found`);
-          return of(null);
-        }
-        return throwError(() => error);
-      })
-    );
+    const headers = this.userService.setAuthHeader();
+    return this.http.get<File>(`${this.apiUrl}/files/${fileId}`, { headers })
+      .pipe(
+        catchError(error => {
+          if (error.status === 404) {
+            return of(null); 
+          }
+          return throwError(() => error);
+        })
+      );
   }
 
-  deleteSelectedMaterials(fileIds: string[]): Observable<any> {
-    return this.http.post(`${this.apiUrl}/files/delete-materials`, { materialIds: fileIds }).pipe(
-      catchError(this.handleError)
-    );
+  deleteSelectedMaterials(fileIds: string[]): Observable<DeleteMaterialsResponse> {
+    const headers = this.userService.setAuthHeader();
+    return this.http.post<DeleteMaterialsResponse>(`${this.apiUrl}/delete-materials`, { materialIds: fileIds }, { headers })
+      .pipe(
+        catchError(this.handleError<DeleteMaterialsResponse>('deleteSelectedMaterials', {
+          message: 'Deletion failed',
+          deletedPaths: [],
+          remainingUploadCount: 0,
+          remainingUploads: []
+        }))
+      );
   }
 
-  requestMaterial(materialIds: string[], materialType: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/files/request-materials`, { materialIDs: materialIds, materialType }).pipe(
-      catchError(this.handleError)
-    );
+  requestMaterial(materialIds: string[], materialType: string): Observable<StudyMaterialResponse> {
+    const headers = this.userService.setAuthHeader();
+    return this.http.post<StudyMaterialResponse>(`${this.apiUrl}/request-materials`, { materialIDs: materialIds, materialType }, { headers })
+      .pipe(
+        catchError(this.handleError<StudyMaterialResponse>('requestMaterial', {
+          message: 'Failed to generate study materials',
+          studyMaterials: ''
+        }))
+      );
   }
 
-  private handleError(error: HttpErrorResponse): Observable<never> {
-    let errorMessage = 'An unknown error occurred!';
-    if (error.error instanceof ErrorEvent) {
-      errorMessage = `Error: ${error.error.message}`;
-    } else {
-      errorMessage = `Backend returned code ${error.status}, body was: ${JSON.stringify(error.error)}`;
-    }
-    console.error(errorMessage);
-    return throwError(() => new Error(errorMessage));
+  // --- Error Handling ---
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(`${operation} failed:`, error);
+  
+      // Check for 401 Unauthorized and handle appropriately
+      if (error instanceof HttpErrorResponse && error.status === 401) {
+        console.log('Unauthorized error, handling logout or error display...');
+  
+        // *** Important: Re-throw the error! *** 
+        return throwError(() => error);  
+      }
+  
+      return of(result as T); 
+    };
   }
 
-  // Getters for the BehaviorSubjects
+  // --- Observables for Component Consumption ---
   get semesters$(): Observable<Semester[]> {
     return this.semestersSubject.asObservable();
   }

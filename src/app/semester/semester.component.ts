@@ -2,12 +2,16 @@ import { Component, OnInit, ChangeDetectorRef, ViewChild, ElementRef } from '@an
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Observable, BehaviorSubject } from 'rxjs';
-import { map, take } from 'rxjs/operators';
+import { map, take, switchMap } from 'rxjs/operators';
 import { FileService } from '../file.service';
 import { Semester } from '../models/semester.model';
 import { ClassList } from '../models/class-list.model';
 import { Chapter } from '../models/chapter.model';
 import { SelectedMaterialService } from '../../app/selected-material.service';
+import { UserService } from '../user.service';
+import { User } from '../models/user';
+import { Router } from '@angular/router';
+
 
 @Component({
   selector: 'app-semester',
@@ -26,9 +30,16 @@ export class SemesterComponent implements OnInit {
   selectedChapterIds$ = new BehaviorSubject<string[]>([]);
   selectedSemesterIds$ = new BehaviorSubject<string[]>([]);
   selectedClassListIds$ = new BehaviorSubject<string[]>([]);
+  showClassList = false;
+
+  user: User = { // Define the user property with an initial value
+    username: '',
+    password: '',
+    email: ''
+  };
 
   newSemesterName = '';
-  userId = '6643d532b06cfcf923e551b4';
+ 
 
   isExactlyOneSemesterSelected$: Observable<boolean>;
   isExactlyOneClassListSelected$: Observable<boolean>;
@@ -36,6 +47,8 @@ export class SemesterComponent implements OnInit {
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
   constructor(
+    private router: Router,
+    private userService: UserService,
     private fileService: FileService,
     private cdRef: ChangeDetectorRef,
     private selectedMaterialService: SelectedMaterialService
@@ -53,8 +66,39 @@ export class SemesterComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.fileService.getSemesters(this.userId).subscribe();
+    // 1. Check if the user is already authenticated
+    if (this.userService.isAuthenticated()) {
+      this.fetchSemesters(); 
+    } else {
+      // 2. If not authenticated, trigger the login process
+      //    (You'll need to implement this part based on your app's flow)
+      //    For example, you might redirect to a login page:
+      //    this.router.navigate(['/login']); 
+
+      // 3. After successful login, subscribe to the login observable
+      this.userService.loginUser(this.user).pipe(
+        switchMap(() => this.fileService.getSemesters())
+      ).subscribe(semesters => {
+        // Handle the fetched semesters
+        console.log('Semesters fetched:', semesters);
+        // ... any other logic to update your component's state
+      });
+    }
   }
+
+  fetchSemesters() {
+    this.fileService.getSemesters().subscribe(
+      semesters => {
+        console.log('Semesters fetched:', semesters);
+        // ... any other logic to update your component's state
+      },
+      error => {
+        console.error('Error fetching semesters:', error);
+      }
+    );
+  }
+  
+  
 
   onItemSelect(event: Event, type: 'semester' | 'classList' | 'chapter' | 'file', id: string | undefined): void {
     if (!id) return;
@@ -100,14 +144,17 @@ export class SemesterComponent implements OnInit {
   onFileSelected(event: Event): void {
     const fileInput = event.target as HTMLInputElement;
     const files = fileInput.files;
+  
     if (files && files.length > 0) {
       this.selectedChapterIds$.pipe(take(1)).subscribe(selectedChapterIds => {
         if (selectedChapterIds.length === 1) {
           const chapterId = selectedChapterIds[0];
           const formData = new FormData();
-          for (let i = 0; i < files.length; i++) {
-            formData.append('files', files[i]);
+  
+          for (const file of Array.from(files)) {
+            formData.append('files', file);
           }
+  
           formData.append('chapterId', chapterId);
           this.uploadFiles(formData, chapterId);
         } else {
@@ -115,24 +162,30 @@ export class SemesterComponent implements OnInit {
         }
       });
     }
+  
     fileInput.value = '';
   }
+  
+  
 
-  uploadFiles(formData: FormData, chapterId: string): void {
-    this.fileService.uploadFiles(formData).subscribe(
-      response => {
-        console.log('Files uploaded successfully', response);
-        this.selectedClassListId$.pipe(take(1)).subscribe(classListId => {
-          if (classListId) {
-            this.fileService.getChapters(classListId).subscribe();
-          }
-        });
-      },
-      error => {
-        console.error('Error uploading files', error);
-      }
-    );
-  }
+  /* eslint-disable @typescript-eslint/no-unused-vars */
+uploadFiles(formData: FormData, chapterId: string): void {
+  this.fileService.uploadFiles(formData).subscribe(
+    response => {
+      console.log('Files uploaded successfully', response);
+      this.selectedClassListId$.pipe(take(1)).subscribe(classListId => {
+        if (classListId) {
+          this.fileService.getChapters(classListId).subscribe();
+        }
+      });
+    },
+    error => {
+      console.error('Error uploading files', error);
+    }
+  );
+}
+/* eslint-enable @typescript-eslint/no-unused-vars */
+
 
   deleteSelectedItems(): void {
     const selectedSemesterIds = this.selectedSemesterIds$.value;
@@ -153,7 +206,7 @@ export class SemesterComponent implements OnInit {
       this.fileService.deleteSemester(id).subscribe(
         () => {
           console.log(`Semester ${id} deleted successfully`);
-          this.fileService.getSemesters(this.userId).subscribe();
+          this.fileService.getSemesters().subscribe();
         },
         error => console.error(`Error deleting semester ${id}:`, error)
       );
@@ -214,15 +267,25 @@ export class SemesterComponent implements OnInit {
 
   createSemester(): void {
     if (this.newSemesterName.trim() !== '') {
-      this.fileService.createSemester(this.newSemesterName, this.userId).subscribe();
+      this.fileService.createSemester(this.newSemesterName).subscribe();
       this.newSemesterName = '';
     }
   }
 
-  onSemesterSelect(semesterId: string | undefined): void {
+  onSemesterSelect(semesterId: string | undefined, event: Event): void { 
     if (!semesterId) return;
+  
+    event.preventDefault(); // Prevent the default link navigation 
+  
     this.selectedSemesterId$.next(semesterId);
-    this.fileService.getClassLists(semesterId).subscribe();
+    this.fileService.getClassLists(semesterId).subscribe(
+      () => {
+        this.showClassList = true;
+      },
+      error => { 
+        console.error('Error fetching class lists:', error); 
+      }
+    );
   }
 
   createClassList(): void {
@@ -244,11 +307,13 @@ export class SemesterComponent implements OnInit {
     });
   }
 
-  onClassListSelect(classList: ClassList): void {
+  onClassListSelect(classList: ClassList, event: Event): void { // Add event argument 
+    event.preventDefault(); // Prevent default link behavior 
+  
     if (classList && classList._id) {
       this.selectedClassListId$.next(classList._id);
       this.fileService.getChapters(classList._id).subscribe(
-        chapters => {
+        chapters => { 
           console.log('Chapters in component:', chapters);
           this.cdRef.detectChanges();
         },

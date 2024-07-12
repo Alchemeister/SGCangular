@@ -1,4 +1,4 @@
-@import '@circlon/angular-tree-component/css/angular-tree-component.css';
+
 @import 'bootstrap/dist/css/bootstrap.min.css';
 
 html, body { height: 100%; }
@@ -18,10 +18,5 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
   
   .upload-box:hover {
     background-color: #f0f0f0;
-  }
-  
-  .plus-sign {
-    font-size: 72px;
-    color: #999;
   }
   

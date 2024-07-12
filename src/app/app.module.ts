@@ -1,10 +1,12 @@
 import { NgModule } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
-import { HttpClientModule } from '@angular/common/http';
-import { RouterModule } from '@angular/router'; // Import RouterModule
+import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
+import { RouterModule } from '@angular/router';
 
 import { AppComponent } from './app.component';
-import { routes } from './app.routes'; // Import your routes
+import { routes } from './app.routes';
+
+import { AuthInterceptor } from './auth.interceptor';
 
 import { SelectedMaterialService } from './selected-material.service';
 import { DashboardComponent } from './dashboard.component'; // Import DashboardComponent
@@ -25,7 +27,10 @@ import { LoginComponent } from './login/login.component';
     RouterModule.forRoot(routes), 
     FormsModule
   ],
-  providers: [SelectedMaterialService],
+  providers: [
+    SelectedMaterialService,
+    { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true }
+  ],  
   bootstrap: [AppComponent]
 })
 export class AppModule { }
