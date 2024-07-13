@@ -10,31 +10,37 @@
     <li *ngFor="let semester of semesters$ | async">
       <input type="checkbox" [value]="semester._id" (change)="onItemSelect($event, 'semester', semester._id)">
       <span class="semester-name">
-        {{ semester.name }} 
+        {{ semester.name }}
         <button class="expand-button" (click)="onSemesterSelect(semester._id, $event)">
-          <span class="plus-sign" *ngIf="(selectedSemesterId$ | async) !== semester._id">+</span>
-          <span class="minus-sign" *ngIf="(selectedSemesterId$ | async) === semester._id">-</span>
+          <span class="plus-sign" *ngIf="!(selectedSemesterId$ | async)?.includes(semester._id)">+</span>
+          <span class="minus-sign" *ngIf="(selectedSemesterId$ | async)?.includes(semester._id)">-</span>
         </button>
       </span>
 
-      <ul *ngIf="(selectedSemesterId$ | async) === semester._id">
+      <ul *ngIf="(selectedSemesterId$ | async)?.includes(semester._id)">
         <li *ngFor="let classList of classLists$ | async">
           <input type="checkbox" [value]="classList._id" (change)="onItemSelect($event, 'classList', classList._id)">
-          <span class="class-list-name"> 
-            {{ classList.name }} 
+          <span class="class-list-name">
+            {{ classList.name }}
             <button class="btn btn-link btn-sm expand-button" (click)="onClassListSelect(classList, $event)">
-              <span class="plus-sign" *ngIf="(selectedClassListId$ | async) !== classList._id">+</span>
-              <span class="minus-sign" *ngIf="(selectedClassListId$ | async) === classList._id">-</span>
+              <span class="plus-sign" *ngIf="!(selectedClassListId$ | async)?.includes(classList._id)">+</span>
+              <span class="minus-sign" *ngIf="(selectedClassListId$ | async)?.includes(classList._id)">-</span>
             </button>
           </span>
 
           <!-- Chapters Display -->
-          <ul *ngIf="(selectedClassListId$ | async) === classList._id"> 
+          <ul *ngIf="(selectedClassListId$ | async)?.includes(classList._id)">
             <li *ngFor="let chapter of chapters$ | async">
               <input type="checkbox" [value]="chapter._id" (change)="onItemSelect($event, 'chapter', chapter._id)">
-              {{ chapter.name }}
-
-              <ul *ngIf="chapter.fileUploadIds && chapter.fileUploadIds.length > 0">
+              <span class="chapter-name">
+                {{ chapter.name }}
+                <button class="btn btn-link btn-sm expand-button" (click)="onChapterSelect(chapter._id, $event)">
+                  <span class="plus-sign" *ngIf="!(selectedChapterIds$ | async)?.includes(chapter._id)">+</span>
+                  <span class="minus-sign" *ngIf="(selectedChapterIds$ | async)?.includes(chapter._id)">-</span>
+                </button>
+              </span>
+              <!-- Files Display -->
+              <ul *ngIf="(selectedChapterIds$ | async)?.includes(chapter._id)">
                 <li *ngFor="let file of chapter.fileUploadIds">
                   <input type="checkbox"
                          [value]="file._id"
@@ -42,32 +48,28 @@
                          (change)="onItemSelect($event, 'file', file._id)">
                   {{ file.originalFilename }}
                 </li>
-              </ul>                  
+              </ul>
               <ng-container *ngIf="!chapter.fileUploadIds || chapter.fileUploadIds.length === 0">
                 <p>No files uploaded for this chapter.</p>
               </ng-container>
-            </li> 
-          </ul> 
+            </li>
+          </ul>
         </li>
       </ul>
     </li>
   </ul>
 </div>
 
-<div> 
-  <input 
-    type="file"
-    #fileInput
-    style="display: none;"
-    (change)="onFileSelected($event)"
-    multiple />
+<input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;" multiple>
+
+<div>
   <button (click)="triggerFileUpload()" [disabled]="!(isExactlyOneChapterSelected() | async)">
     Upload File
-  </button>
-  <button (click)="deleteSelectedItems()" 
-        [disabled]="(selectedSemesterIds$ | async)?.length === 0 && 
-                    (selectedClassListIds$ | async)?.length === 0 && 
-                    (selectedChapterIds$ | async)?.length === 0 && 
+  </button>  
+  <button (click)="deleteSelectedItems()"
+        [disabled]="(selectedSemesterIds$ | async)?.length === 0 &&
+                    (selectedClassListIds$ | async)?.length === 0 &&
+                    (selectedChapterIds$ | async)?.length === 0 &&
                     (selectedFileIds$ | async)?.length === 0">
   Delete Selected
 </button>

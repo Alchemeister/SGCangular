@@ -135,36 +135,16 @@ export class SemesterComponent implements OnInit {
 
   triggerFileUpload(): void {
     this.isExactlyOneChapterSelected().pipe(take(1)).subscribe(isOneChapterSelected => {
-      if (isOneChapterSelected) {
+      if (isOneChapterSelected && this.fileInput) {
         this.fileInput.nativeElement.click();
+      } else {
+        console.error('Please select exactly one chapter for file upload');
       }
     });
   }
+  
 
-  onFileSelected(event: Event): void {
-    const fileInput = event.target as HTMLInputElement;
-    const files = fileInput.files;
   
-    if (files && files.length > 0) {
-      this.selectedChapterIds$.pipe(take(1)).subscribe(selectedChapterIds => {
-        if (selectedChapterIds.length === 1) {
-          const chapterId = selectedChapterIds[0];
-          const formData = new FormData();
-  
-          for (const file of Array.from(files)) {
-            formData.append('files', file);
-          }
-  
-          formData.append('chapterId', chapterId);
-          this.uploadFiles(formData, chapterId);
-        } else {
-          console.error('Please select exactly one chapter for file upload');
-        }
-      });
-    }
-  
-    fileInput.value = '';
-  }
   
   
 
@@ -341,7 +321,49 @@ uploadFiles(formData: FormData, chapterId: string): void {
     });
   }
 
-  isExactlyOneChapterSelected(): Observable<boolean> {
-    return this.selectedChapterIds$.pipe(map(ids => ids.length === 1));
+  
+  
+  onFileSelected(event: Event): void {
+    const fileInput = event.target as HTMLInputElement;
+    const files = fileInput.files;
+  
+    if (files && files.length > 0) {
+      this.selectedChapterIds$.pipe(take(1)).subscribe(chapterIds => {
+        if (chapterIds && chapterIds.length === 1) {
+          const chapterId = chapterIds[0];
+          const formData = new FormData();
+          for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+          }
+          formData.append('chapterId', chapterId);
+          this.uploadFiles(formData, chapterId);
+        } else {
+          console.error('Please select exactly one chapter for file upload');
+        }
+      });
+    }
   }
-}
+  
+  
+  
+  
+
+  
+  onChapterSelect(chapterId: string | undefined, event: Event): void {
+    if (!chapterId) return;
+    event.preventDefault();
+    this.selectedChapterIds$.pipe(take(1)).subscribe(currentIds => {
+      if (currentIds.includes(chapterId)) {
+        this.selectedChapterIds$.next(currentIds.filter(id => id !== chapterId));
+      } else {
+        this.selectedChapterIds$.next([...currentIds, chapterId]);
+      }
+    });
+  }
+  
+  isExactlyOneChapterSelected(): Observable<boolean> {
+    return this.selectedChapterIds$.pipe(
+      map(ids => ids && ids.length === 1)
+    );
+  }
+}  
