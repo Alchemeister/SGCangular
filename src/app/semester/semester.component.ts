@@ -150,12 +150,6 @@ export class SemesterComponent implements OnInit {
   }
 
   
-  triggerFileUploadAlwaysEnabled(): void {
-    if (this.fileInput) {
-      this.fileInput.nativeElement.click();
-    }
-  }
-  
    triggerFileUpload(): void {
     this.isExactlyOneChapterSelected().pipe(take(1)).subscribe(isOneChapterSelected => {
       if (isOneChapterSelected && this.fileInput) {

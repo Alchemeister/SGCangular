@@ -56,6 +56,8 @@ export class DashboardComponent implements OnInit {
   requestMaterial() {
     console.log('Requesting material of type:', this.materialType);
   
+    this.createAndShowModal(this.createLoadingContent());
+  
     this.selectedMaterialService.selectedMaterials$.pipe(
       take(1),
       switchMap(selectedMaterials => {
@@ -93,6 +95,7 @@ export class DashboardComponent implements OnInit {
       }
     });
   }
+  
   
   
 
@@ -178,14 +181,41 @@ export class DashboardComponent implements OnInit {
     // *** Now append the fully constructed modalDiv to the document.body ***
     this.renderer.appendChild(this.document.body, modalDiv);
   
-    // Create and show the modal
     const modal = new Modal(modalDiv);
-    modal.show();
-  
-    modalDiv.addEventListener('hidden.bs.modal', () => {
-      this.renderer.removeChild(this.document.body, modalDiv);
-    });
+modal.show();
+
+// Add click event listener to the modal
+modalDiv.addEventListener('click', (event: MouseEvent) => {
+  if (event.target === modalDiv) {
+    modal.hide();
+    this.renderer.removeChild(this.document.body, modalDiv);
   }
+});
+
+modalDiv.addEventListener('hidden.bs.modal', () => {
+  if (modalDiv.parentNode === this.document.body) {
+    this.renderer.removeChild(this.document.body, modalDiv);
+  }
+  document.body.classList.remove('modal-open');
+  const backdrop = document.querySelector('.modal-backdrop');
+  if (backdrop && backdrop.parentNode) {
+    backdrop.parentNode.removeChild(backdrop);
+  }
+});
+
+}
+
+  private createLoadingContent(): string {
+    return `
+      <div class="text-center">
+        <div class="spinner-border" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Generating quiz...</p>
+      </div>
+    `;
+  }
+  
   
   onAnswerSelect(questionNumber: number, selectedAnswer: string): void {
     this.userAnswers[questionNumber] = selectedAnswer;

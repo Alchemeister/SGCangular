@@ -68,12 +68,6 @@
   <button (click)="triggerFileUpload()" [disabled]="!(isExactlyOneChapterSelected() | async)">
     Upload File
   </button>  
-
-  <!-- Always Enabled Upload File Button -->
-  <button (click)="triggerFileUploadAlwaysEnabled()">
-    Always Enabled Upload File
-  </button>
-
   <button (click)="deleteSelectedItems()"
         [disabled]="(selectedSemesterIds$ | async)?.length === 0 &&
                     (selectedClassListIds$ | async)?.length === 0 &&
