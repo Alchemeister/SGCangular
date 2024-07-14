@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
-import { Observable, throwError, of, BehaviorSubject } from 'rxjs';
+import { Observable, throwError, of, BehaviorSubject, Subject } from 'rxjs';
 import { catchError, switchMap, tap } from 'rxjs/operators';
 import { Semester } from './models/semester.model';
 import { ClassList } from './models/class-list.model';
@@ -61,6 +61,10 @@ export class FileService {
         catchError(this.handleError<Semester>('createSemester'))
       );
   }
+
+  private uploadCompletedSubject = new Subject<void>();
+  uploadCompleted$ = this.uploadCompletedSubject.asObservable();
+  
 
   deleteSemester(semesterId: string): Observable<void> {
     const headers = this.userService.setAuthHeader();
@@ -155,9 +159,18 @@ export class FileService {
   
     return this.http.post<UploadResponse>(`${this.apiUrl}/upload`, formData, { headers })
       .pipe(
+        tap(() => {
+          this.uploadCompletedSubject.next();
+          // Refresh chapters data
+          const classListId = formData.get('classListId') as string;
+          if (classListId) {
+            this.getChapters(classListId).subscribe();
+          }
+        }),
         catchError(this.handleError<UploadResponse>('uploadFiles', { message: 'Upload failed' }))
       );
   }
+  
   
 
   getFileDetails(fileId: string): Observable<File | null> {

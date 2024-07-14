@@ -1,7 +1,7 @@
 import { Component, OnInit, ChangeDetectorRef, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Observable, BehaviorSubject } from 'rxjs';
+import { Observable, BehaviorSubject, Subject } from 'rxjs';
 import { map, take, switchMap } from 'rxjs/operators';
 import { FileService } from '../file.service';
 import { Semester } from '../models/semester.model';
@@ -31,6 +31,7 @@ export class SemesterComponent implements OnInit {
   selectedSemesterIds$ = new BehaviorSubject<string[]>([]);
   selectedClassListIds$ = new BehaviorSubject<string[]>([]);
   showClassList = false;
+  expandedChapterIds$ = new BehaviorSubject<string[]>([]);
 
   user: User = { // Define the user property with an initial value
     username: '',
@@ -66,25 +67,33 @@ export class SemesterComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // 1. Check if the user is already authenticated
     if (this.userService.isAuthenticated()) {
-      this.fetchSemesters(); 
+      this.fetchSemesters();
+      this.fileService.uploadCompleted$.subscribe(() => {
+        this.refreshChapterData();
+      });
     } else {
-      // 2. If not authenticated, trigger the login process
-      //    (You'll need to implement this part based on your app's flow)
-      //    For example, you might redirect to a login page:
-      //    this.router.navigate(['/login']); 
-
-      // 3. After successful login, subscribe to the login observable
       this.userService.loginUser(this.user).pipe(
         switchMap(() => this.fileService.getSemesters())
       ).subscribe(semesters => {
-        // Handle the fetched semesters
         console.log('Semesters fetched:', semesters);
-        // ... any other logic to update your component's state
       });
     }
   }
+  
+
+  
+  
+  private syncUIState(): void {
+    this.selectedChapterIds$.pipe(take(1)).subscribe(selectedIds => {
+      console.log('Syncing UI state, selected chapter IDs:', selectedIds);
+      // Update UI elements based on the current state
+      // This could involve updating checkboxes, enabling/disabling buttons, etc.
+    });
+  }
+
+  private lastSelectedChapterId: string | null = null;
+
 
   fetchSemesters() {
     this.fileService.getSemesters().subscribe(
@@ -103,7 +112,7 @@ export class SemesterComponent implements OnInit {
   onItemSelect(event: Event, type: 'semester' | 'classList' | 'chapter' | 'file', id: string | undefined): void {
     if (!id) return;
     const checkbox = event.target as HTMLInputElement;
-
+  
     switch (type) {
       case 'semester':
         this.updateSelection(this.selectedSemesterIds$, id, checkbox.checked);
@@ -113,6 +122,7 @@ export class SemesterComponent implements OnInit {
         break;
       case 'chapter':
         this.updateSelection(this.selectedChapterIds$, id, checkbox.checked);
+        console.log('Chapter selection updated:', this.selectedChapterIds$.value); // Add this line for debugging
         break;
       case 'file':
         this.updateSelection(this.selectedFileIds$, id, checkbox.checked);
@@ -124,16 +134,29 @@ export class SemesterComponent implements OnInit {
         break;
     }
   }
-
+  
+  
+  
+  
+  
+  
   private updateSelection(subject: BehaviorSubject<string[]>, id: string, isChecked: boolean): void {
     const currentSelection = subject.value;
     const newSelection = isChecked
       ? [...currentSelection, id]
       : currentSelection.filter(selectedId => selectedId !== id);
     subject.next(newSelection);
+    console.log('Updated selection:', newSelection); // Add this line for debugging
   }
 
-  triggerFileUpload(): void {
+  
+  triggerFileUploadAlwaysEnabled(): void {
+    if (this.fileInput) {
+      this.fileInput.nativeElement.click();
+    }
+  }
+  
+   triggerFileUpload(): void {
     this.isExactlyOneChapterSelected().pipe(take(1)).subscribe(isOneChapterSelected => {
       if (isOneChapterSelected && this.fileInput) {
         this.fileInput.nativeElement.click();
@@ -143,9 +166,6 @@ export class SemesterComponent implements OnInit {
     });
   }
   
-
-  
-  
   
 
   /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -154,6 +174,7 @@ uploadFiles(formData: FormData, chapterId: string): void {
     response => {
       console.log('Files uploaded successfully', response);
       this.selectedClassListId$.pipe(take(1)).subscribe(classListId => {
+        this.uploadCompletedSubject.next();
         if (classListId) {
           this.fileService.getChapters(classListId).subscribe();
         }
@@ -165,6 +186,9 @@ uploadFiles(formData: FormData, chapterId: string): void {
   );
 }
 /* eslint-enable @typescript-eslint/no-unused-vars */
+
+private uploadCompletedSubject = new Subject<void>();
+uploadCompleted$ = this.uploadCompletedSubject.asObservable();
 
 
   deleteSelectedItems(): void {
@@ -323,43 +347,120 @@ uploadFiles(formData: FormData, chapterId: string): void {
 
   
   
+  
+  
+  
+  private updateChapterSelection(chapterId: string, isSelected: boolean) {
+    this.selectedChapterIds$.pipe(take(1)).subscribe(currentIds => {
+      let newIds = isSelected
+        ? Array.from(new Set([...currentIds, chapterId]))
+        : currentIds.filter(id => id !== chapterId);
+      this.selectedChapterIds$.next(newIds);
+      console.log('Chapter selection updated:', newIds);
+    });
+  }
+  
+  
+  onChapterSelect(chapterId: string, event: Event): void {
+    event.preventDefault();
+    const isSelected = (event.target as HTMLInputElement).checked;
+    this.updateChapterSelection(chapterId, isSelected);
+  }
+  
   onFileSelected(event: Event): void {
     const fileInput = event.target as HTMLInputElement;
     const files = fileInput.files;
   
     if (files && files.length > 0) {
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+      }
+  
       this.selectedChapterIds$.pipe(take(1)).subscribe(chapterIds => {
-        if (chapterIds && chapterIds.length === 1) {
-          const chapterId = chapterIds[0];
-          const formData = new FormData();
-          for (let i = 0; i < files.length; i++) {
-            formData.append('files', files[i]);
-          }
+        const uniqueChapterIds = Array.from(new Set(chapterIds));
+        if (uniqueChapterIds.length === 1) {
+          const chapterId = uniqueChapterIds[0];
           formData.append('chapterId', chapterId);
-          this.uploadFiles(formData, chapterId);
+          console.log('Sending formData:', formData);
+          this.fileService.uploadFiles(formData).subscribe(
+            (response) => {
+              console.log('Upload successful:', response);
+              if (this.fileInput) {
+                this.fileInput.nativeElement.value = '';
+              }
+              this.lastSelectedChapterId = chapterId;
+              this.refreshChapterData();
+            },
+            error => console.error('Error uploading file:', error)
+          );
         } else {
-          console.error('Please select exactly one chapter for file upload');
+          console.error('Exactly one unique chapter must be selected for file upload');
         }
       });
     }
   }
   
   
+  refreshChapterData(): void {
+    this.selectedClassListId$.pipe(take(1)).subscribe(classListId => {
+      if (classListId) {
+        this.fileService.getChapters(classListId).subscribe(
+          chapters => {
+            console.log('Chapters refreshed:', chapters);
+            if (this.lastSelectedChapterId && chapters.some(ch => ch._id === this.lastSelectedChapterId)) {
+              this.updateChapterSelection(this.lastSelectedChapterId, true);
+            } else {
+              this.selectedChapterIds$.next([]);
+            }
+            this.reconcileChapterState(chapters);
+          },
+          error => console.error('Error refreshing chapters:', error)
+        );
+      }
+    });
+  }
+  
+  private reconcileChapterState(chapters: any[]): void {
+    this.selectedChapterIds$.pipe(take(1)).subscribe(selectedIds => {
+      const validIds = chapters.map(ch => ch._id);
+      const newSelectedIds = selectedIds.filter(id => validIds.includes(id));
+      this.selectedChapterIds$.next(newSelectedIds);
+      console.log('Reconciled chapter state:', newSelectedIds);
+    });
+  }
+  
+  
+  
+  
+
+    
+  onChapterExpand(chapterId: string, event: Event): void {
+    event.preventDefault();
+    this.expandedChapterIds$.pipe(take(1)).subscribe(currentIds => {
+      let newIds;
+      if (currentIds.includes(chapterId)) {
+        newIds = currentIds.filter(id => id !== chapterId);
+      } else {
+        newIds = [...currentIds, chapterId];
+      }
+      this.expandedChapterIds$.next(newIds);
+      console.log('Expanded chapter IDs:', newIds); // Add this line for debugging
+    });
+  }
+  
+  
+  
   
   
 
   
-  onChapterSelect(chapterId: string | undefined, event: Event): void {
-    if (!chapterId) return;
-    event.preventDefault();
-    this.selectedChapterIds$.pipe(take(1)).subscribe(currentIds => {
-      if (currentIds.includes(chapterId)) {
-        this.selectedChapterIds$.next(currentIds.filter(id => id !== chapterId));
-      } else {
-        this.selectedChapterIds$.next([...currentIds, chapterId]);
-      }
-    });
-  }
+  
+  
+  
+  
+  
+  
   
   isExactlyOneChapterSelected(): Observable<boolean> {
     return this.selectedChapterIds$.pipe(
