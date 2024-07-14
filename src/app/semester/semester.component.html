@@ -31,26 +31,24 @@
           <!-- Chapters Display -->
           <ul *ngIf="(selectedClassListId$ | async)?.includes(classList._id)">
             <li *ngFor="let chapter of chapters$ | async">
-              <li *ngFor="let chapter of chapters$ | async">
-                <input type="checkbox" [value]="chapter._id" (change)="onChapterSelect(chapter._id, $event)">
-                <span class="chapter-name">
-                  {{ chapter.name }}
-                  <button class="btn btn-link btn-sm expand-button" (click)="onChapterExpand(chapter._id, $event)">
-                    <span class="plus-sign" *ngIf="!(expandedChapterIds$ | async)?.includes(chapter._id)">+</span>
-                    <span class="minus-sign" *ngIf="(expandedChapterIds$ | async)?.includes(chapter._id)">-</span>
-                  </button>
-                </span>
+              <input type="checkbox" [value]="chapter._id" (change)="onChapterSelect(chapter._id, $event)">
+              <span class="chapter-name">
+                {{ chapter.name }}
+                <button class="btn btn-link btn-sm expand-button" (click)="onChapterExpand(chapter._id, $event)">
+                  <span class="plus-sign" *ngIf="!(expandedChapterIds$ | async)?.includes(chapter._id)">+</span>
+                  <span class="minus-sign" *ngIf="(expandedChapterIds$ | async)?.includes(chapter._id)">-</span>
+                </button>
+              </span>
               <!-- Files Display -->
               <ul *ngIf="(expandedChapterIds$ | async)?.includes(chapter._id)">
-                <!-- ... file list ... -->
                 <li *ngFor="let file of chapter.fileUploadIds">
-                  <input type="checkbox"
-                         [value]="file._id"
-                         [checked]="(selectedFileIds$ | async)?.includes(file._id)"
-                         (change)="onItemSelect($event, 'file', file._id)">
+                  <input type="checkbox" [value]="file._id"
+                         [checked]="isFileSelected(file._id) | async"
+                         (change)="onFileSelect(file._id, $event)">
                   {{ file.originalFilename }}
                 </li>
               </ul>
+              
               <ng-container *ngIf="!chapter.fileUploadIds || chapter.fileUploadIds.length === 0">
                 <p>No files uploaded for this chapter.</p>
               </ng-container>
@@ -69,10 +67,10 @@
     Upload File
   </button>  
   <button (click)="deleteSelectedItems()"
-        [disabled]="(selectedSemesterIds$ | async)?.length === 0 &&
-                    (selectedClassListIds$ | async)?.length === 0 &&
-                    (selectedChapterIds$ | async)?.length === 0 &&
-                    (selectedFileIds$ | async)?.length === 0">
+          [disabled]="(selectedSemesterIds$ | async)?.length === 0 &&
+                      (selectedClassListIds$ | async)?.length === 0 &&
+                      (selectedChapterIds$ | async)?.length === 0 &&
+                      (selectedFileIds$ | async)?.length === 0">
     Delete Selected
   </button>
   <button (click)="createClassList()" [disabled]="!(isExactlyOneSemesterSelected$ | async)">

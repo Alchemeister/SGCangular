@@ -6,6 +6,7 @@ import { Semester } from './models/semester.model';
 import { ClassList } from './models/class-list.model';
 import { Chapter } from './models/chapter.model';
 import { UserService } from './user.service';
+import { File as CustomFile } from './models/file.model';
 
 // Interfaces for API responses
 interface StudyMaterialResponse {
@@ -23,7 +24,9 @@ interface DeleteMaterialsResponse {
 
 interface UploadResponse {
   message: string;
+  uploadedFiles: CustomFile[];
 }
+
 
 @Injectable({
   providedIn: 'root'
@@ -167,7 +170,7 @@ export class FileService {
             this.getChapters(classListId).subscribe();
           }
         }),
-        catchError(this.handleError<UploadResponse>('uploadFiles', { message: 'Upload failed' }))
+        catchError(this.handleError<UploadResponse>('uploadFiles', { message: 'Upload failed', uploadedFiles: [] }))
       );
   }
   

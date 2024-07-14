@@ -11,6 +11,7 @@ import { SelectedMaterialService } from '../../app/selected-material.service';
 import { UserService } from '../user.service';
 import { User } from '../models/user';
 import { Router } from '@angular/router';
+import { File as CustomFile } from '../models/file.model';
 
 
 @Component({
@@ -79,6 +80,10 @@ export class SemesterComponent implements OnInit {
         console.log('Semesters fetched:', semesters);
       });
     }
+
+    this.selectedFileIds$.subscribe(fileIds => {
+      this.selectedMaterialService.setSelectedMaterials(fileIds);
+    });
   }
   
 
@@ -344,22 +349,49 @@ uploadCompleted$ = this.uploadCompletedSubject.asObservable();
   
   
   
-  private updateChapterSelection(chapterId: string, isSelected: boolean) {
-    this.selectedChapterIds$.pipe(take(1)).subscribe(currentIds => {
-      let newIds = isSelected
-        ? Array.from(new Set([...currentIds, chapterId]))
-        : currentIds.filter(id => id !== chapterId);
-      this.selectedChapterIds$.next(newIds);
-      console.log('Chapter selection updated:', newIds);
+  
+  
+  
+  
+  
+  private updateBulkSelection(subject: BehaviorSubject<string[]>, ids: string[], isSelected: boolean): void {
+    subject.pipe(take(1)).subscribe(currentIds => {
+      let newIds = currentIds;
+      if (isSelected) {
+        newIds = Array.from(new Set([...currentIds, ...ids]));
+      } else {
+        newIds = currentIds.filter(id => !ids.includes(id));
+      }
+      subject.next(newIds);
     });
   }
   
   
+  
   onChapterSelect(chapterId: string, event: Event): void {
-    event.preventDefault();
     const isSelected = (event.target as HTMLInputElement).checked;
-    this.updateChapterSelection(chapterId, isSelected);
+    this.updateSelection(this.selectedChapterIds$, chapterId, isSelected);
+  
+    this.chapters$.pipe(
+      take(1),
+      map(chapters => chapters.find(ch => ch._id === chapterId))
+    ).subscribe(chapter => {
+      if (chapter) {
+        const fileIds = chapter.fileUploadIds.map(file => file._id);
+        this.updateBulkSelection(this.selectedFileIds$, fileIds, isSelected);
+      }
+    });
   }
+  
+  
+  isFileSelected(fileId: string): Observable<boolean> {
+    return this.selectedFileIds$.pipe(
+      map(ids => ids.includes(fileId))
+    );
+  }
+  
+  
+  
   
   onFileSelected(event: Event): void {
     const fileInput = event.target as HTMLInputElement;
@@ -385,6 +417,8 @@ uploadCompleted$ = this.uploadCompletedSubject.asObservable();
               }
               this.lastSelectedChapterId = chapterId;
               this.refreshChapterData();
+              // Update selected files after upload
+              this.updateSelectedFilesAfterUpload(chapterId, response.uploadedFiles);
             },
             error => console.error('Error uploading file:', error)
           );
@@ -396,6 +430,9 @@ uploadCompleted$ = this.uploadCompletedSubject.asObservable();
   }
   
   
+  
+  
+  
   refreshChapterData(): void {
     this.selectedClassListId$.pipe(take(1)).subscribe(classListId => {
       if (classListId) {
@@ -403,9 +440,14 @@ uploadCompleted$ = this.uploadCompletedSubject.asObservable();
           chapters => {
             console.log('Chapters refreshed:', chapters);
             if (this.lastSelectedChapterId && chapters.some(ch => ch._id === this.lastSelectedChapterId)) {
-              this.updateChapterSelection(this.lastSelectedChapterId, true);
+              const lastSelectedChapter = chapters.find(ch => ch._id === this.lastSelectedChapterId);
+              if (lastSelectedChapter) {
+                this.updateSelection(this.selectedChapterIds$, lastSelectedChapter._id, true);
+                this.updateFileSelectionForChapter(lastSelectedChapter, true);
+              }
             } else {
               this.selectedChapterIds$.next([]);
+              this.selectedFileIds$.next([]);
             }
             this.reconcileChapterState(chapters);
           },
@@ -414,6 +456,7 @@ uploadCompleted$ = this.uploadCompletedSubject.asObservable();
       }
     });
   }
+  
   
   private reconcileChapterState(chapters: any[]): void {
     this.selectedChapterIds$.pipe(take(1)).subscribe(selectedIds => {
@@ -424,6 +467,30 @@ uploadCompleted$ = this.uploadCompletedSubject.asObservable();
     });
   }
   
+  
+  private updateChapterSelection(chapterOrId: Chapter | string, isSelected: boolean) {
+    const chapterId = typeof chapterOrId === 'string' ? chapterOrId : chapterOrId._id;
+    this.selectedChapterIds$.pipe(take(1)).subscribe(currentIds => {
+      let newIds = isSelected
+        ? Array.from(new Set([...currentIds, chapterId]))
+        : currentIds.filter(id => id !== chapterId);
+      this.selectedChapterIds$.next(newIds);
+      console.log('Chapter selection updated:', newIds);
+    });
+  
+    // If we have the full Chapter object, we can update file selections too
+    if (typeof chapterOrId !== 'string') {
+      this.updateFileSelectionForChapter(chapterOrId, isSelected);
+    }
+  }
+  
+  
+  private updateSelectedFilesAfterUpload(chapterId: string, uploadedFiles: CustomFile[]) {
+    this.selectedFileIds$.pipe(take(1)).subscribe(currentFileIds => {
+      const newFileIds = [...currentFileIds, ...uploadedFiles.map(file => file._id)];
+      this.selectedFileIds$.next(Array.from(new Set(newFileIds)));
+    });
+  }
   
   
   
@@ -445,9 +512,24 @@ uploadCompleted$ = this.uploadCompletedSubject.asObservable();
   
   
   
+  onFileSelect(fileId: string, event: Event): void {
+    const isSelected = (event.target as HTMLInputElement).checked;
+    this.updateSelection(this.selectedFileIds$, fileId, isSelected);
+  }
   
   
-
+  private updateFileSelectionForChapter(chapter: Chapter, isSelected: boolean): void {
+    this.selectedFileIds$.pipe(take(1)).subscribe(currentFileIds => {
+      let newFileIds = currentFileIds;
+      if (isSelected) {
+        newFileIds = [...newFileIds, ...chapter.fileUploadIds.map(file => file._id)];
+      } else {
+        newFileIds = newFileIds.filter(id => !chapter.fileUploadIds.some(file => file._id === id));
+      }
+      this.selectedFileIds$.next(Array.from(new Set(newFileIds)));
+    });
+  }
+  
   
   
   
