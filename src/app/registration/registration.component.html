@@ -1,19 +1,22 @@
 <p>Register</p>
-<form #registrationForm="ngForm" (ngSubmit)="onSubmit()">
+<form [formGroup]="registrationForm" (ngSubmit)="onSubmit()">
   <div>
     <label for="username">Username:</label>
-    <input type="text" id="username" name="username" [(ngModel)]="user.username" required>
+    <input type="text" id="username" formControlName="username" required>
+  </div>
+
+  <div>
+    <label for="email">Email:</label>
+    <input type="email" id="email" formControlName="email" required>
   </div>
 
   <div>
     <label for="password">Password:</label>
-    <input type="password" id="password" name="password" [(ngModel)]="user.password" required>
+    <input type="password" id="password" formControlName="password" required>
+    <div *ngIf="registrationForm.get('password')?.errors?.['passwordComplexity']">
+      Password must be at least 8 characters long and include uppercase, lowercase, a number, and a special character.
+    </div>
   </div>
 
-  <div> <label for="email">Email:</label>
-    <input type="email" id="email" name="email" [(ngModel)]="user.email" required>
-  </div>
-
-  <button type="submit" [disabled]="!registrationForm.form.valid">Register</button>
+  <button type="submit" [disabled]="!registrationForm.valid">Register</button>
 </form>
-  
