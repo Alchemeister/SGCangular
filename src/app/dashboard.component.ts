@@ -9,7 +9,8 @@ import { Modal } from 'bootstrap';
 import { SelectedMaterialService } from './selected-material.service';
 import { EMPTY } from 'rxjs';
 import { take, switchMap } from 'rxjs/operators';
-
+import { Router } from '@angular/router';
+import { UserService } from './user.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -32,7 +33,9 @@ export class DashboardComponent implements OnInit {
     private renderer: Renderer2,
     @Inject(DOCUMENT) private document: Document,
     private sanitizer: DomSanitizer,
-    private selectedMaterialService: SelectedMaterialService
+    private selectedMaterialService: SelectedMaterialService,
+    private router: Router,
+    private userService: UserService
   ) {}
 
   ngOnInit(): void {
@@ -52,6 +55,10 @@ export class DashboardComponent implements OnInit {
   
   
 
+  logout() {
+    this.userService.clearToken();
+    this.router.navigate(['/login']);
+  }
 
   requestMaterial() {
     console.log('Requesting material of type:', this.materialType);

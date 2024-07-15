@@ -1,4 +1,7 @@
-<h2>SGCangular</h2>
+<div class="title-bar">
+  <h1>SGC</h1>
+  <button (click)="logout()" class="logout-button">Logout</button>
+</div>
 
 <app-semester></app-semester>
 
@@ -8,7 +11,7 @@
     <label for="materialType" class="form-label">Material Type:</label>
     <select class="form-select" id="materialType" [(ngModel)]="materialType" name="materialType" required>
       <option value="">Select a material type</option>
-      <option value="notes">Notes</option>
+      <option value="test">Test</option>
       <option value="flashcards">Flashcards</option>
       <option value="quiz">Quiz</option>
     </select>
