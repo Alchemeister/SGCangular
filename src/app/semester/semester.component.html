@@ -61,22 +61,21 @@
 </div>
 
 <input type="file" #fileInput (change)="onFileSelected($event)" style="display: none;" multiple>
-
-<div>
-  <button (click)="triggerFileUpload()" [disabled]="!(isExactlyOneChapterSelected() | async)">
+<div class="button-group">
+  <button class="btn btn-primary action-button" (click)="triggerFileUpload()" [disabled]="!(isExactlyOneChapterSelected() | async)">
     Upload File
-  </button>  
-  <button (click)="deleteSelectedItems()"
-          [disabled]="(selectedSemesterIds$ | async)?.length === 0 &&
-                      (selectedClassListIds$ | async)?.length === 0 &&
-                      (selectedChapterIds$ | async)?.length === 0 &&
+  </button>
+  <button class="btn btn-danger action-button" (click)="deleteSelectedItems()" 
+          [disabled]="(selectedSemesterIds$ | async)?.length === 0 && 
+                      (selectedClassListIds$ | async)?.length === 0 && 
+                      (selectedChapterIds$ | async)?.length === 0 && 
                       (selectedFileIds$ | async)?.length === 0">
     Delete Selected
   </button>
-  <button (click)="createClassList()" [disabled]="!(isExactlyOneSemesterSelected$ | async)">
+  <button class="btn btn-primary action-button" (click)="createClassList()" [disabled]="!(isExactlyOneSemesterSelected$ | async)">
     Create Class List
   </button>
-  <button (click)="createChapter()" [disabled]="!(isExactlyOneClassListSelected$ | async)">
+  <button class="btn btn-primary action-button" (click)="createChapter()" [disabled]="!(isExactlyOneClassListSelected$ | async)">
     Create Chapter
-  </button>  
+  </button>
 </div>

@@ -3,18 +3,20 @@
   <button (click)="logout()" class="logout-button">Logout</button>
 </div>
 
-<app-semester></app-semester>
+<div class="dashboard-container">
+  <h3>Request Study Material</h3>
+  <form (ngSubmit)="requestMaterial()">
+    <div class="mb-3">
+      <label for="materialType" class="form-label">Material Type:</label>
+      <select class="form-select" id="materialType" [(ngModel)]="materialType" name="materialType" required>
+        <option value="">Select a material type</option>
+        <option value="test">Test</option>
+        <option value="flashcards">Flashcards</option>
+        <option value="quiz">Quiz</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-primary action-button">Request Material</button>
+  </form>
 
-<h3>Request Study Material</h3>
-<form (ngSubmit)="requestMaterial()">
-  <div class="mb-3">
-    <label for="materialType" class="form-label">Material Type:</label>
-    <select class="form-select" id="materialType" [(ngModel)]="materialType" name="materialType" required>
-      <option value="">Select a material type</option>
-      <option value="test">Test</option>
-      <option value="flashcards">Flashcards</option>
-      <option value="quiz">Quiz</option>
-    </select>
-  </div>
-  <button type="submit" mat-raised-button color="primary">Request Material</button>
-</form>
+  <app-semester></app-semester>
+</div>

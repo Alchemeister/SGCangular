@@ -3,11 +3,13 @@ import { DashboardComponent } from '../app/dashboard.component';
 import { RegistrationComponent } from './registration/registration.component';
 import { LoginComponent } from './login/login.component';
 import { AuthGuard } from '../auth.guard';
+import { HomeComponent } from './home/home.component';
+
 
 export const routes: Routes = [
+  { path: '', component: HomeComponent },
   { path: 'dashboard', component: DashboardComponent, canActivate: [AuthGuard] },
   { path: 'register', component: RegistrationComponent },
   { path: 'login', component: LoginComponent },
-  { path: '', redirectTo: '/login', pathMatch: 'full' },
-  { path: '**', redirectTo: '/login' } // Wildcard route as fallback
+  { path: '**', redirectTo: '', pathMatch: 'full' }
 ];

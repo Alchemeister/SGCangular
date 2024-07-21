@@ -18,5 +18,14 @@
     </div>
   </div>
 
+  <div>
+    <label for="confirmPassword">Confirm Password:</label>
+    <input type="password" id="confirmPassword" formControlName="confirmPassword" required>
+    <div *ngIf="registrationForm.get('confirmPassword')?.errors?.['passwordMismatch']">
+      Passwords do not match.
+    </div>
+  </div>
+  
+
   <button type="submit" [disabled]="!registrationForm.valid">Register</button>
 </form>

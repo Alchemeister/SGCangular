@@ -33,33 +33,25 @@ export class RegistrationComponent implements OnInit {
     this.registrationForm = this.fb.group({
       username: ['', [Validators.required]],
       email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.required, this.passwordValidator]]
-    });
+      password: ['', [Validators.required, passwordValidator]],
+      confirmPassword: ['', [Validators.required]]
+    }, { validator: this.passwordMatchValidator });
   }
 
   ngOnInit() {
-    this.registrationForm = this.fb.group({
-      username: ['', [Validators.required]],
-      email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.required, passwordValidator]]
-    });
+    // Form is already initialized in the constructor, so we don't need to reinitialize it here
   }
 
-  passwordValidator(control: AbstractControl): ValidationErrors | null {
-    const value = control.value;
-    const hasUpperCase = /[A-Z]+/.test(value);
-    const hasLowerCase = /[a-z]+/.test(value);
-    const hasNumeric = /[0-9]+/.test(value);
-    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(value);
-    
-    if (value.length < 8 || !hasUpperCase || !hasLowerCase || !hasNumeric || !hasSpecialChar) {
-      return { passwordComplexity: true };
+  passwordMatchValidator(form: FormGroup) {
+    const password = form.get('password');
+    const confirmPassword = form.get('confirmPassword');
+    if (password && confirmPassword && password.value !== confirmPassword.value) {
+      confirmPassword.setErrors({ passwordMismatch: true });
+    } else if (confirmPassword) {
+      confirmPassword.setErrors(null);
     }
-    
-    return null;
   }
-
-
+  
   onSubmit() {
     if (this.registrationForm.valid) {
       const user: User = this.registrationForm.value;
