@@ -1,31 +1,32 @@
-<p>Register</p>
-<form [formGroup]="registrationForm" (ngSubmit)="onSubmit()">
-  <div>
-    <label for="username">Username:</label>
-    <input type="text" id="username" formControlName="username" required>
-  </div>
-
-  <div>
-    <label for="email">Email:</label>
-    <input type="email" id="email" formControlName="email" required>
-  </div>
-
-  <div>
-    <label for="password">Password:</label>
-    <input type="password" id="password" formControlName="password" required>
-    <div *ngIf="registrationForm.get('password')?.errors?.['passwordComplexity']">
-      Password must be at least 8 characters long and include uppercase, lowercase, a number, and a special character.
+<div class="container">
+  <h3 class="mb-4">Register</h3>
+  <form [formGroup]="registrationForm" (ngSubmit)="onSubmit()">
+    <div class="mb-3">
+      <label for="username" class="form-label">Username:</label>
+      <input type="text" id="username" formControlName="username" required class="form-control">
     </div>
-  </div>
 
-  <div>
-    <label for="confirmPassword">Confirm Password:</label>
-    <input type="password" id="confirmPassword" formControlName="confirmPassword" required>
-    <div *ngIf="registrationForm.get('confirmPassword')?.errors?.['passwordMismatch']">
-      Passwords do not match.
+    <div class="mb-3">
+      <label for="email" class="form-label">Email:</label>
+      <input type="email" id="email" formControlName="email" required class="form-control">
     </div>
-  </div>
-  
 
-  <button type="submit" [disabled]="!registrationForm.valid">Register</button>
-</form>
+    <div class="mb-3">
+      <label for="password" class="form-label">Password:</label>
+      <input type="password" id="password" formControlName="password" required class="form-control">
+      <div *ngIf="registrationForm.get('password')?.errors?.['passwordComplexity']" class="text-danger">
+        Password must be at least 8 characters long and include uppercase, lowercase, a number, and a special character.
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label for="confirmPassword" class="form-label">Confirm Password:</label>
+      <input type="password" id="confirmPassword" formControlName="confirmPassword" required class="form-control">
+      <div *ngIf="registrationForm.get('confirmPassword')?.errors?.['passwordMismatch']" class="text-danger">
+        Passwords do not match.
+      </div>
+    </div>
+
+    <button type="submit" [disabled]="!registrationForm.valid" class="btn btn-primary">Register</button>
+  </form>
+</div>

@@ -65,6 +65,10 @@ export class UserService {
     return !!token;
   }
   
+  changePassword(passwordData: any) {
+    return this.http.post(`${this.apiUrl}/change-password`, passwordData);
+  }
+  
   getCurrentUser(): Observable<User> {
     return this.http.get<User>(`${this.apiUrl}/me`, { headers: this.setAuthHeader() });
   }

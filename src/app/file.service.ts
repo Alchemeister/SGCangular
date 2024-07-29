@@ -152,6 +152,31 @@ export class FileService {
       );
   }
 
+
+  saveMaterial(content: string, type: string, title: string): Observable<any> {
+    console.log('Sending save request:', { content, type, title });
+    const headers = this.userService.setAuthHeader();
+    return this.http.post(`${this.apiUrl}/study-materials`, { content, type, title }, { headers }).pipe(
+      tap(response => console.log('Save response:', response)),
+      catchError(error => {
+        console.error('Save error:', error);
+        return throwError(() => error);
+      })
+    );
+  }
+  
+  
+  getSavedMaterials(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/study-materials`).pipe(
+      tap(materials => console.log('Retrieved saved materials:', materials)),
+      catchError(error => {
+        console.error('Error fetching saved materials:', error);
+        return throwError(() => error);
+      })
+    );
+  }
+  
+
   // --- File Management --- 
   uploadFiles(formData: FormData): Observable<UploadResponse> {
     const headers = this.userService.setAuthHeader();
