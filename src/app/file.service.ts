@@ -154,29 +154,33 @@ export class FileService {
 
 
   saveMaterial(content: string, type: string, title: string): Observable<any> {
-    console.log('Sending save request:', { content, type, title });
     const headers = this.userService.setAuthHeader();
     return this.http.post(`${this.apiUrl}/study-materials`, { content, type, title }, { headers }).pipe(
       tap(response => console.log('Save response:', response)),
-      catchError(error => {
-        console.error('Save error:', error);
-        return throwError(() => error);
-      })
+      catchError(this.handleError<any>('saveMaterial'))
     );
   }
-  
   
   getSavedMaterials(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/study-materials`).pipe(
+    const headers = this.userService.setAuthHeader();
+    return this.http.get<any[]>(`${this.apiUrl}/study-materials`, { headers }).pipe(
       tap(materials => console.log('Retrieved saved materials:', materials)),
-      catchError(error => {
-        console.error('Error fetching saved materials:', error);
-        return throwError(() => error);
-      })
+      catchError(this.handleError<any[]>('getSavedMaterials', []))
     );
   }
   
+  private handleError<T>(operation = 'operation', result?: T) {
+    return (error: any): Observable<T> => {
+      console.error(`${operation} failed:`, error);
+      return of(result as T);
+    };
+  }
+  
+  
+  
 
+
+  
   // --- File Management --- 
   uploadFiles(formData: FormData): Observable<UploadResponse> {
     const headers = this.userService.setAuthHeader();
@@ -238,22 +242,7 @@ export class FileService {
       );
   }
 
-  // --- Error Handling ---
-  private handleError<T>(operation = 'operation', result?: T) {
-    return (error: any): Observable<T> => {
-      console.error(`${operation} failed:`, error);
-  
-      // Check for 401 Unauthorized and handle appropriately
-      if (error instanceof HttpErrorResponse && error.status === 401) {
-        console.log('Unauthorized error, handling logout or error display...');
-  
-        // *** Important: Re-throw the error! *** 
-        return throwError(() => error);  
-      }
-  
-      return of(result as T); 
-    };
-  }
+ 
 
   // --- Observables for Component Consumption ---
   get semesters$(): Observable<Semester[]> {
